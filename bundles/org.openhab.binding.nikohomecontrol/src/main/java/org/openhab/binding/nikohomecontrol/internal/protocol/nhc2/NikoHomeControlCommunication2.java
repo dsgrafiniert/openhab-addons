@@ -71,7 +71,6 @@ public class NikoHomeControlCommunication2 extends NikoHomeControlCommunication
 
     private final NhcMqttConnection2 mqttConnection;
 
-    private final List<NhcProfile2> profiles = new CopyOnWriteArrayList<>();
     private final List<NhcService2> services = new CopyOnWriteArrayList<>();
 
     private volatile String profile = "";
@@ -168,9 +167,6 @@ public class NikoHomeControlCommunication2 extends NikoHomeControlCommunication
         message.method = "systeminfo.publish";
         mqttConnection.connectionPublish(profile + "/system/cmd", gson.toJson(message));
 
-        message.method = "profiles.list";
-        mqttConnection.connectionPublish("public/authentication/cmd", gson.toJson(message));
-
         message.method = "services.list";
         mqttConnection.connectionPublish(profile + "/authentication/cmd", gson.toJson(message));
 
@@ -230,27 +226,6 @@ public class NikoHomeControlCommunication2 extends NikoHomeControlCommunication
         }
         if (systemInfo != null) {
             nhcSystemInfo = systemInfo.get(0);
-        }
-    }
-
-    private void profilesListRsp(String response) {
-        Type messageType = new TypeToken<NhcMessage2>() {
-        }.getType();
-        List<NhcProfile2> profileList = null;
-        try {
-            NhcMessage2 message = gson.fromJson(response, messageType);
-            List<NhcMessageParam> messageParams = message.params;
-            if (messageParams != null) {
-                profileList = messageParams.stream().filter(p -> (p.profiles != null)).findFirst().get().profiles;
-            }
-        } catch (JsonSyntaxException e) {
-            logger.debug("Niko Home Control: unexpected json {}", response);
-        } catch (NoSuchElementException ignore) {
-            // Ignore if profiles not present in response, this should not happen in a profiles response
-        }
-        profiles.clear();
-        if (profileList != null) {
-            profiles.addAll(profileList);
         }
     }
 
@@ -432,10 +407,12 @@ public class NikoHomeControlCommunication2 extends NikoHomeControlCommunication
                 thermostats.put(device.uuid, nhcThermostat);
             }
         } else if ("centralmeter".equals(device.type)) {
-            logger.debug("Niko Home Control: adding centralmeter device {}, {}", device.uuid, device.name);
-            NhcEnergyMeter2 nhcEnergyMeter = new NhcEnergyMeter2(device.uuid, device.name, device.model,
-                    device.technology, this, scheduler);
-            energyMeters.put(device.uuid, nhcEnergyMeter);
+            if (!energyMeters.containsKey(device.uuid)) {
+                logger.debug("Niko Home Control: adding centralmeter device {}, {}", device.uuid, device.name);
+                NhcEnergyMeter2 nhcEnergyMeter = new NhcEnergyMeter2(device.uuid, device.name, device.model,
+                        device.technology, this, scheduler);
+                energyMeters.put(device.uuid, nhcEnergyMeter);
+            }
         } else {
             logger.debug("Niko Home Control: device type {} not supported for {}, {}", device.type, device.uuid,
                     device.name);
@@ -507,10 +484,8 @@ public class NikoHomeControlCommunication2 extends NikoHomeControlCommunication
     private void updateRollershutterState(NhcAction2 action, NhcDevice2 device) {
         Optional<NhcProperty> positionProperty = device.properties.stream().filter(p -> (p.position != null))
                 .findFirst();
-        Optional<NhcProperty> movingProperty = device.properties.stream().filter(p -> (p.moving != null)).findFirst();
 
-        if (!(movingProperty.isPresent() && Boolean.parseBoolean(movingProperty.get().moving))
-                && positionProperty.isPresent()) {
+        if (positionProperty.isPresent()) {
             action.setState(Integer.parseInt(positionProperty.get().position));
             logger.debug("Niko Home Control: setting action {} internally to {}", action.getId(),
                     positionProperty.get().position);
@@ -584,7 +559,7 @@ public class NikoHomeControlCommunication2 extends NikoHomeControlCommunication
                 .ifPresent(electricalPower -> {
                     try {
                         energyMeter.setPower(Integer.parseInt(electricalPower));
-                        logger.debug("Niko Home Control: setting energy meter {} power to {}", energyMeter.getId(),
+                        logger.trace("Niko Home Control: setting energy meter {} power to {}", energyMeter.getId(),
                                 electricalPower);
                     } catch (NumberFormatException e) {
                         energyMeter.setPower(null);
@@ -592,7 +567,6 @@ public class NikoHomeControlCommunication2 extends NikoHomeControlCommunication
                                 energyMeter.getId());
                     }
                 });
-
     }
 
     @Override
@@ -708,7 +682,7 @@ public class NikoHomeControlCommunication2 extends NikoHomeControlCommunication
             device.properties.add(overruleActiveProp);
 
             NhcProperty overruleSetpointProp = new NhcProperty();
-            overruleSetpointProp.overruleSetpoint = String.valueOf(overruleTemp);
+            overruleSetpointProp.overruleSetpoint = String.valueOf(overruleTemp / 10.0);
             device.properties.add(overruleSetpointProp);
 
             NhcProperty overruleTimeProp = new NhcProperty();
@@ -791,19 +765,16 @@ public class NikoHomeControlCommunication2 extends NikoHomeControlCommunication
     @Override
     public void processMessage(String topic, byte[] payload) {
         String message = new String(payload);
-        if ("public/system/evt".equals(topic) || (profile + "/system/evt").equals(topic)) {
+        if ((profile + "/system/evt").equals(topic)) {
             systemEvt(message);
         } else if ((profile + "/system/rsp").equals(topic)) {
             logger.debug("Niko Home Control: received topic {}, payload {}", topic, message);
             systeminfoPublishRsp(message);
-        } else if ("public/authentication/rsp".equals(topic)) {
-            logger.debug("Niko Home Control: received topic {}, payload {}", topic, message);
-            profilesListRsp(message);
         } else if ((profile + "/notification/evt").equals(topic)) {
             logger.debug("Niko Home Control: received topic {}, payload {}", topic, message);
             notificationEvt(message);
         } else if ((profile + "/control/devices/evt").equals(topic)) {
-            logger.debug("Niko Home Control: received topic {}, payload {}", topic, message);
+            logger.trace("Niko Home Control: received topic {}, payload {}", topic, message);
             devicesEvt(message);
         } else if ((profile + "/control/devices/rsp").equals(topic)) {
             logger.debug("Niko Home Control: received topic {}, payload {}", topic, message);
@@ -811,7 +782,7 @@ public class NikoHomeControlCommunication2 extends NikoHomeControlCommunication
         } else if ((profile + "/authentication/rsp").equals(topic)) {
             logger.debug("Niko Home Control: received topic {}, payload {}", topic, message);
             servicesListRsp(message);
-        } else if ("public/control/devices.error".equals(topic) || (profile + "/control/devices.error").equals(topic)) {
+        } else if ((profile + "/control/devices.error").equals(topic)) {
             logger.warn("Niko Home Control: received error {}", message);
         } else {
             logger.trace("Niko Home Control: not acted on received message topic {}, payload {}", topic, message);
@@ -838,13 +809,6 @@ public class NikoHomeControlCommunication2 extends NikoHomeControlCommunication
             timeInfo = new NhcTimeInfo2();
         }
         return timeInfo;
-    }
-
-    /**
-     * @return comma separated list of profiles with uuid's retrieved from Connected Controller
-     */
-    public String getProfiles() {
-        return profiles.stream().map(NhcProfile2::profile).collect(Collectors.joining(", "));
     }
 
     /**

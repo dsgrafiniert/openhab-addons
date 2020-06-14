@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 
@@ -26,8 +27,8 @@ import org.openhab.binding.insteon.internal.config.InsteonChannelConfiguration;
 import org.openhab.binding.insteon.internal.device.DeviceType.FeatureGroup;
 import org.openhab.binding.insteon.internal.driver.Driver;
 import org.openhab.binding.insteon.internal.message.FieldException;
-import org.openhab.binding.insteon.internal.message.Msg;
 import org.openhab.binding.insteon.internal.message.InvalidMessageTypeException;
+import org.openhab.binding.insteon.internal.message.Msg;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +59,6 @@ public class InsteonDevice {
     private static final int TIME_BETWEEN_POLL_MESSAGES = 1500;
 
     private InsteonAddress address = new InsteonAddress();
-    private ArrayList<String> ports = new ArrayList<>();
     private long pollInterval = -1L; // in milliseconds
     private @Nullable Driver driver = null;
     private HashMap<String, @Nullable DeviceFeature> features = new HashMap<>();
@@ -105,10 +105,6 @@ public class InsteonDevice {
         return driver;
     }
 
-    public boolean hasValidPorts() {
-        return (!ports.isEmpty());
-    }
-
     public long getPollInterval() {
         return pollInterval;
     }
@@ -143,13 +139,6 @@ public class InsteonDevice {
 
     public long getPollOverDueTime() {
         return (lastTimePolled - lastMsgReceived);
-    }
-
-    public String getPort() throws IOException {
-        if (ports.isEmpty()) {
-            throw new IOException("no ports configured for instrument " + getAddress());
-        }
-        return (ports.iterator().next());
     }
 
     public boolean hasAnyListeners() {
@@ -205,20 +194,6 @@ public class InsteonDevice {
         synchronized (mrequestQueue) {
             return (featureQueried);
         }
-    };
-
-    /**
-     * Add a port. Currently only a single port is being used.
-     *
-     * @param p the port to add
-     */
-    public void addPort(@Nullable String p) {
-        if (p == null) {
-            return;
-        }
-        if (!ports.contains(p)) {
-            ports.add(p);
-        }
     }
 
     /**
@@ -267,7 +242,7 @@ public class InsteonDevice {
      */
     public void doPoll(long delay) {
         long now = System.currentTimeMillis();
-        ArrayList<QEntry> l = new ArrayList<QEntry>();
+        List<QEntry> l = new ArrayList<>();
         synchronized (features) {
             int spacing = 0;
             for (DeviceFeature i : features.values()) {
@@ -300,11 +275,10 @@ public class InsteonDevice {
     /**
      * Handle incoming message for this device by forwarding
      * it to all features that this device supports
-     *
-     * @param fromPort port from which the message come in
+     * 
      * @param msg the incoming message
      */
-    public void handleMessage(String fromPort, Msg msg) {
+    public void handleMessage(Msg msg) {
         synchronized (lastMsgReceived) {
             lastMsgReceived = System.currentTimeMillis();
         }
@@ -314,7 +288,7 @@ public class InsteonDevice {
             for (DeviceFeature f : features.values()) {
                 if (!f.isStatusFeature()) {
                     logger.debug("----- applying message to feature: {}", f.getName());
-                    if (f.handleMessage(msg, fromPort)) {
+                    if (f.handleMessage(msg)) {
                         // handled a reply to a query,
                         // mark it as processed
                         logger.trace("handled reply of direct: {}", f);
@@ -327,7 +301,7 @@ public class InsteonDevice {
             // e.g. when the device was last updated
             for (DeviceFeature f : features.values()) {
                 if (f.isStatusFeature()) {
-                    f.handleMessage(msg, fromPort);
+                    f.handleMessage(msg);
                 }
             }
         }
@@ -343,7 +317,8 @@ public class InsteonDevice {
      * @throws FieldException
      * @throws IOException
      */
-    public Msg makeStandardMessage(byte flags, byte cmd1, byte cmd2) throws FieldException, InvalidMessageTypeException {
+    public Msg makeStandardMessage(byte flags, byte cmd1, byte cmd2)
+            throws FieldException, InvalidMessageTypeException {
         return (makeStandardMessage(flags, cmd1, cmd2, -1));
     }
 
@@ -358,7 +333,8 @@ public class InsteonDevice {
      * @throws FieldException
      * @throws IOException
      */
-    public Msg makeStandardMessage(byte flags, byte cmd1, byte cmd2, int group) throws FieldException, InvalidMessageTypeException {
+    public Msg makeStandardMessage(byte flags, byte cmd1, byte cmd2, int group)
+            throws FieldException, InvalidMessageTypeException {
         Msg m = Msg.makeMessage("SendStandardMessage");
         InsteonAddress addr = null;
         byte f = flags;
@@ -394,7 +370,8 @@ public class InsteonDevice {
      * @throws FieldException
      * @throws IOException
      */
-    public Msg makeExtendedMessage(byte flags, byte cmd1, byte cmd2) throws FieldException, InvalidMessageTypeException {
+    public Msg makeExtendedMessage(byte flags, byte cmd1, byte cmd2)
+            throws FieldException, InvalidMessageTypeException {
         return makeExtendedMessage(flags, cmd1, cmd2, new byte[] {});
     }
 
@@ -409,7 +386,8 @@ public class InsteonDevice {
      * @throws FieldException
      * @throws IOException
      */
-    public Msg makeExtendedMessage(byte flags, byte cmd1, byte cmd2, byte[] data) throws FieldException, InvalidMessageTypeException {
+    public Msg makeExtendedMessage(byte flags, byte cmd1, byte cmd2, byte[] data)
+            throws FieldException, InvalidMessageTypeException {
         Msg m = Msg.makeMessage("SendExtendedMessage");
         m.setAddress("toAddress", getAddress());
         m.setByte("messageFlags", (byte) (((flags & 0xff) | 0x10) & 0xff));
@@ -523,7 +501,7 @@ public class InsteonDevice {
     }
 
     private void writeMessage(Msg m) throws IOException {
-        driver.writeMessage(getPort(), m);
+        driver.writeMessage(m);
     }
 
     private void instantiateFeatures(@Nullable DeviceType dt) {

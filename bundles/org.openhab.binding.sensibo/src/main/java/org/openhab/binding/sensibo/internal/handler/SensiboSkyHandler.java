@@ -182,7 +182,6 @@ public class SensiboSkyHandler extends SensiboBaseThingHandler implements Channe
                         break;
                     default:
                         logger.debug("Received command on unknown channel {}, ignoring", channelUID.getId());
-
                 }
             } else {
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
@@ -292,7 +291,7 @@ public class SensiboSkyHandler extends SensiboBaseThingHandler implements Channe
 
     private void handleCurrentTemperatureCommand(ChannelUID channelUID, Command command, SensiboSky sensiboSky) {
         if (command instanceof RefreshType) {
-            updateState(channelUID, new QuantityType<>(sensiboSky.getTemperature(), sensiboSky.getTemperatureUnit()));
+            updateState(channelUID, new QuantityType<>(sensiboSky.getTemperature(), SIUnits.CELSIUS));
         }
     }
 
@@ -420,7 +419,6 @@ public class SensiboSkyHandler extends SensiboBaseThingHandler implements Channe
      * Package private in order to be reachable from unit test
      */
     StateChange checkStateChangeValid(SensiboSky sensiboSky, String property, Object newPropertyValue) {
-
         StateChange stateChange = new StateChange(newPropertyValue);
 
         sensiboSky.getCurrentModeCapabilities().ifPresent(currentModeCapabilities -> {
@@ -485,7 +483,7 @@ public class SensiboSkyHandler extends SensiboBaseThingHandler implements Channe
         }
 
         public void updateValue(Object updatedValue) {
-            this.value = updatedValue;
+            value = updatedValue;
         }
 
         public void addError(String validationMessage) {

@@ -79,7 +79,7 @@ public class MiIoAsyncCommunication {
     private static final int MAX_ERRORS = 3;
     private static final int MAX_ID = 15000;
 
-    private ConcurrentLinkedQueue<MiIoSendCommand> concurrentLinkedQueue = new ConcurrentLinkedQueue<MiIoSendCommand>();
+    private ConcurrentLinkedQueue<MiIoSendCommand> concurrentLinkedQueue = new ConcurrentLinkedQueue<>();
 
     public MiIoAsyncCommunication(String ip, byte[] token, byte[] did, int id, int timeout) {
         this.ip = ip;
@@ -146,8 +146,12 @@ public class MiIoAsyncCommunication {
             MiIoSendCommand sendCmd = new MiIoSendCommand(cmdId, MiIoCommand.getCommand(command),
                     fullCommand.toString());
             concurrentLinkedQueue.add(sendCmd);
-            logger.debug("Command added to Queue {} -> {} (Device: {} token: {} Queue: {})", fullCommand.toString(), ip,
-                    Utils.getHex(deviceId), Utils.getHex(token), concurrentLinkedQueue.size());
+            if (logger.isDebugEnabled()) {
+                // Obfuscate part of the token to allow sharing of the logfiles
+                String tokenText = Utils.obfuscateToken(Utils.getHex(token));
+                logger.debug("Command added to Queue {} -> {} (Device: {} token: {} Queue: {})", fullCommand.toString(),
+                        ip, Utils.getHex(deviceId), tokenText, concurrentLinkedQueue.size());
+            }
             if (needPing) {
                 sendPing(ip);
             }
@@ -306,7 +310,7 @@ public class MiIoAsyncCommunication {
         if (!connected) {
             connected = true;
             status = ThingStatusDetail.NONE;
-            updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE);
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE);
         } else {
             if (ThingStatusDetail.CONFIGURATION_ERROR.equals(status)) {
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR);
