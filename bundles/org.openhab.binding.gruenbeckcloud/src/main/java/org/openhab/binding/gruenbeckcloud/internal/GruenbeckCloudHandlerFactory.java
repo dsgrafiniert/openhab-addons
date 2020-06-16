@@ -19,16 +19,22 @@ import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.smarthome.core.auth.client.oauth2.OAuthFactory;
+import org.eclipse.smarthome.core.thing.Bridge;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingTypeUID;
 import org.eclipse.smarthome.core.thing.binding.BaseThingHandlerFactory;
 import org.eclipse.smarthome.core.thing.binding.ThingHandler;
 import org.eclipse.smarthome.core.thing.binding.ThingHandlerFactory;
+import org.eclipse.smarthome.io.net.http.HttpClientFactory;
+import org.openhab.binding.gruenbeckcloud.internal.handler.GruenbeckCloudBridgeHandler;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 
 /**
- * The {@link GruenbeckCloudHandlerFactory} is responsible for creating things and thing
- * handlers.
+ * The {@link GruenbeckCloudHandlerFactory} is responsible for creating things
+ * and thing handlers.
  *
  * @author Dominik Schön - Initial contribution
  */
@@ -36,21 +42,44 @@ import org.osgi.service.component.annotations.Component;
 @Component(configurationPid = "binding.gruenbeckcloud", service = ThingHandlerFactory.class)
 public class GruenbeckCloudHandlerFactory extends BaseThingHandlerFactory {
 
-    private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Collections.singleton(THING_TYPE_SAMPLE);
+    private @NonNullByDefault({}) OAuthFactory oAuthFactory;
+    private @NonNullByDefault({}) HttpClient httpClient;
 
     @Override
     public boolean supportsThingType(ThingTypeUID thingTypeUID) {
-        return SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID);
+        return THING_TYPE_GBC_SOFTENER.equals(thingTypeUID) || THING_TYPE_GBC_BRIDGE.equals(thingTypeUID);
     }
 
     @Override
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
-        if (THING_TYPE_SAMPLE.equals(thingTypeUID)) {
+     /*   if (THING_TYPE_GBC_SOFTENER.equals(thingTypeUID)) {
             return new GruenbeckCloudHandler(thing);
+        } else */
+        if (THING_TYPE_GBC_BRIDGE.equals(thingTypeUID)) {
+            return new GruenbeckCloudBridgeHandler((Bridge) thing);
         }
 
         return null;
+    }
+
+
+    @Reference
+    protected void setOAuthFactory(OAuthFactory oAuthFactory) {
+        this.oAuthFactory = oAuthFactory;
+    }
+
+    protected void unsetOAuthFactory(OAuthFactory oAuthFactory) {
+        this.oAuthFactory = null;
+    }
+
+    @Reference
+    protected void setHttpClientFactory(HttpClientFactory httpClientFactory) {
+        this.httpClient = httpClientFactory.getCommonHttpClient();
+    }
+
+    protected void unsetHttpClientFactory(HttpClientFactory httpClientFactory) {
+        this.httpClient = null;
     }
 }

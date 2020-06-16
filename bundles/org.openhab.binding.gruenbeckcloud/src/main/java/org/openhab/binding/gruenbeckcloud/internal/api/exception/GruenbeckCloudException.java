@@ -10,17 +10,17 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.binding.gruenbeckcloud.internal;
+package org.openhab.binding.gruenbeckcloud.internal.api.exception;
 
 /**
- * The {@link GruenbeckCloudConfiguration} class contains fields mapping thing configuration parameters.
+ * Generic Gruenbeck Cloud Exception class.
  *
  * @author Dominik Schön - Initial contribution
  */
-public class GruenbeckCloudConfiguration {
+public class GruenbeckCloudException extends RuntimeException {
 
-    /**
-     * Sample configuration parameter. Replace with your own.
-     */
-    public String config1;
+    public GruenbeckCloudException(final String message) {
+        super(message);
+    }
+
 }
