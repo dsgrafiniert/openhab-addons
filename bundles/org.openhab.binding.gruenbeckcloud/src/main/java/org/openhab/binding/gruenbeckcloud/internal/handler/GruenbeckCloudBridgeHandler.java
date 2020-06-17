@@ -18,13 +18,19 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
@@ -50,7 +56,9 @@ import org.eclipse.smarthome.core.thing.binding.ThingHandlerCallback;
 import org.eclipse.smarthome.core.types.Command;
 import org.eclipse.smarthome.core.types.State;
 import org.eclipse.smarthome.io.net.http.HttpUtil;
+import org.ietf.jgss.GSSException;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBridgeConfiguration;
+import org.openhab.binding.gruenbeckcloud.internal.api.model.Device;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,6 +79,10 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
     private String policy;
     private String tenant;
 
+    private String accessToken;
+    private String refreshToken;
+    private ScheduledFuture<?> initializeTask;
+
     public GruenbeckCloudBridgeHandler(Bridge bridge) {
         super(bridge);
     }
@@ -82,6 +94,16 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
         config = getConfigAs(GruenbeckCloudBridgeConfiguration.class);
 
         updateStatus(ThingStatus.UNKNOWN);
+
+        Runnable refresher = () -> asyncInitialize();
+
+        this.initializeTask = scheduler.schedule(refresher, 2, TimeUnit.SECONDS);
+       
+
+    }
+
+    private void asyncInitialize(){
+        logger.debug("Start async initializing!");
 
         final CodeChallenge challenge = getCodeChallenge();
         // Instantiate and configure the SslContextFactory
@@ -97,7 +119,6 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
             logger.debug("initialize Error during HTTP communication", e);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR);
         }
-
     }
 
     private void sendLoginRequest(CodeChallenge challenge) {
@@ -210,7 +231,10 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
             tokenResponse = request.send();
             logger.debug("getTokens response headers: {}", tokenResponse.getHeaders());
             logger.debug("getTokens Result from WS call: {}", tokenResponse.getContentAsString());
-            updateStatus(ThingStatus.UNKNOWN);
+            JsonObject responseJSON = new Gson().fromJson(tokenResponse.getContentAsString(), JsonObject.class);
+            accessToken = responseJSON.get("access_token").getAsString();
+            refreshToken = responseJSON.get("refresh_token").getAsString();
+            updateStatus(ThingStatus.ONLINE);
 
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
             // TODO Auto-generated catch block
@@ -259,6 +283,10 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
     public void dispose() {
         super.dispose();
         try {
+            if (this.initializeTask != null) {
+                this.initializeTask.cancel(true);
+                this.initializeTask = null;
+            }
             httpClient.stop();
         } catch (Exception e) {
             // TODO Auto-generated catch block
@@ -356,6 +384,73 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
 
         public String getHash() { return hash; };
         public String getResult(){ return result; };
+    }
+    
+    public List<Device> getDecivesFromGruenbeckCloud() {
+
+        // const axiosConfig = {
+        //     "headers": {
+        //         "Host": "prod-eu-gruenbeck-api.azurewebsites.net",
+        //         "Accept": "application/json, text/plain, */*",
+        //         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+        //         "Authorization": "Bearer " + accessToken,
+        //         "Accept-Language": "de-de",
+        //         "cache-control": "no-cache"
+        //     }
+        // };
+        // axios.get("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices", axiosConfig).then((response) => {
+        //     if (response.data && response.data.length > 0) {
+        //         try {
+        //             const device = response.data[0];
+        //             mgDeviceId = device.id;
+        //             this.setObjectNotExists(device.id, {
+        //                 type: "state",
+        //                 common: {
+        //                     name: device.name,
+        //                     role: "indicator",
+        //                     type: "mixed",
+        //                     write: false,
+        //                     read: true
+        //                 },
+        //                 native: {}
+        //             });
+
+        //             resolve();
+
+        //         } catch (error) {
+        //             this.log.error(error);
+        //             this.log.debug(response.data);
+        //             reject();
+        //         }
+
+        //     } else {
+        //         reject();
+        //     }
+        // });
+        List<Device> devices = new ArrayList();
+        if (accessToken != null){
+            logger.debug("Start getDevicesFromGruenbeckCloud");
+            httpClient.setFollowRedirects(false);
+            Request request = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices" );
+            request.method(HttpMethod.GET);
+            request.agent("Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148");
+            request.header("Accept", "application/json, text/plain, */*");
+            request.header("Accept-Language", "de-de");
+            request.header("Host", "prod-eu-gruenbeck-api.azurewebsites.net");
+            request.header("Authorization", "Bearer "+accessToken);
+            request.header("cache-control", "no-cache");
+
+            ContentResponse response = null;
+            try {
+                logger.debug("sendCombinedSigninAndSignup headers {}", request.toString());
+                response = request.send();
+                logger.debug("response from getDevicesFromGruenbeckCloud {}", response.getContentAsString());
+                devices = new Gson().fromJson(response.getContentAsString(), new TypeToken<List<Device>>(){}.getType());
+            } catch(Exception e){
+                logger.debug("error during getDevicesFromGruenbeckCloud {}", e.getStackTrace().toString());
+            }
+        }
+        return devices;
     }
     
 }

@@ -9,22 +9,13 @@
 		<label>Grünbeck Cloud Bridge</label>
 		<description>Bridge representing the Grünbeck Cloud Account</description>
 
-		<channels>
-			<channel id="sample" typeId="sample-channel"/>
-		</channels>
-
 		<properties>
 			<property name="user"/>
 		</properties>
 
-		<representation-property>clientId</representation-property>
+		<representation-property>username</representation-property>
 
-		<config-description>
-			<parameter name="username" type="text">
-				<required>true</required>
-				<label>User Name</label>
-				<description>This is the user name required to log in to Grünbeck Cloud</description>
-			</parameter>
+		<config-description>			
 			<parameter name="password" type="text">
 				<required>true</required>
 				<label>Password</label>
@@ -40,8 +31,35 @@
 					of running out of
 					your request quota.</description>
 			</parameter>
+			<parameter name="username" type="text">
+				<required>true</required>
+				<label>User Name</label>
+				<description>This is the user name required to log in to Grünbeck Cloud</description>
+			</parameter>
 		</config-description>
 	</bridge-type>
+
+	<thing-type id="softener">
+		<supported-bridge-type-refs>
+			<bridge-type-ref id="bridge"/>
+		</supported-bridge-type-refs>
+
+		<label>Grünbeck Water Softener</label>
+		<description>Provides communication with Grünbeck Water Softener.</description>
+
+		<config-description>
+			<parameter name="serial" type="text" required="true">
+				<label>Softener Serial</label>
+				<description>Serial number of the softener</description>
+			</parameter>
+
+			<parameter name="name" type="text" required="true">
+				<label>Device Name</label>
+				<description>Name of the softener as provided in myProduct App</description>
+			</parameter>
+
+		</config-description>
+	</thing-type>
 
 	<!-- Sample Channel Type -->
 	<channel-type id="sample-channel">

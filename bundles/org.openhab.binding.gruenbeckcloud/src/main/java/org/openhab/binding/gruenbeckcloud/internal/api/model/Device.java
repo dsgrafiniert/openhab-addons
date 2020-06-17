@@ -15,43 +15,40 @@ package org.openhab.binding.gruenbeckcloud.internal.api.model;
 import com.google.gson.annotations.SerializedName;
 
 /**
- * Spotify Web Api Device data class.
+ * Gruenbeck Cloud Api Device data class.
  *
- * @author Andreas Stenlund - Initial contribution
- * @author Hilbrand Bouwkamp - Moved to it's own class
+ * @author Dominik Schön - Initial contribution
  */
 public class Device {
 
     private String id;
-    @SerializedName("is_active")
-    private boolean active;
-    @SerializedName("is_restricted")
-    private boolean restricted;
+
+    private String serialNumber;
+
+    @SerializedName("has_error")
+    private boolean error;
     private String name;
-    private String type;
-    private Integer volumePercent;
+    private Integer type;
+    private boolean register;
 
     public String getId() {
         return id;
     }
 
-    public boolean isActive() {
-        return active;
+    public String getSerial(){
+        return serialNumber;
     }
 
-    public boolean isRestricted() {
-        return restricted;
+    public boolean hasError() {
+        return error;
     }
 
     public String getName() {
         return name;
     }
 
-    public String getType() {
+    public Integer getType() {
         return type;
     }
 
-    public Integer getVolumePercent() {
-        return volumePercent;
-    }
 }

@@ -12,6 +12,9 @@
  */
 package org.openhab.binding.gruenbeckcloud.internal;
 
+import java.util.Collections;
+import java.util.Set;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.smarthome.core.thing.ThingTypeUID;
 
@@ -29,6 +32,16 @@ public class GruenbeckCloudBindingConstants {
     // List of all Thing Type UIDs
     public static final ThingTypeUID THING_TYPE_GBC_SOFTENER = new ThingTypeUID(BINDING_ID, "softener");
     public static final ThingTypeUID THING_TYPE_GBC_BRIDGE = new ThingTypeUID(BINDING_ID, "bridge");
+
+    public static final Set<ThingTypeUID> DISCOVERABLE_THING_TYPE_UIDS = Collections
+            .singleton(THING_TYPE_GBC_SOFTENER);
+
+
+
+    public static final String CONFIG_ID = "id";
+    public static final String CONFIG_SERIAL = "serial";
+    public static final String CONFIG_NAME = "name";
+    public static final String CONFIG_ERROR = "error";
 
     // List of all Channel ids
     public static final String CHANNEL_1 = "channel1";

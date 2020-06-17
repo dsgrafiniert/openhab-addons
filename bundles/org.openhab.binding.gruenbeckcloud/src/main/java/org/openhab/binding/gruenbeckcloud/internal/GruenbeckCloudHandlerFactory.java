@@ -14,23 +14,26 @@ package org.openhab.binding.gruenbeckcloud.internal;
 
 import static org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBindingConstants.*;
 
-import java.util.Collections;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.smarthome.config.discovery.DiscoveryService;
 import org.eclipse.smarthome.core.auth.client.oauth2.OAuthFactory;
 import org.eclipse.smarthome.core.thing.Bridge;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingTypeUID;
+import org.eclipse.smarthome.core.thing.ThingUID;
 import org.eclipse.smarthome.core.thing.binding.BaseThingHandlerFactory;
 import org.eclipse.smarthome.core.thing.binding.ThingHandler;
 import org.eclipse.smarthome.core.thing.binding.ThingHandlerFactory;
-import org.eclipse.smarthome.io.net.http.HttpClientFactory;
+import org.openhab.binding.gruenbeckcloud.internal.discovery.GruenbeckCloudDiscoveryService;
 import org.openhab.binding.gruenbeckcloud.internal.handler.GruenbeckCloudBridgeHandler;
+import org.openhab.binding.gruenbeckcloud.internal.handler.GruenbeckCloudSoftenerHandler;
+import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.Reference;
 
 /**
  * The {@link GruenbeckCloudHandlerFactory} is responsible for creating things
@@ -45,6 +48,8 @@ public class GruenbeckCloudHandlerFactory extends BaseThingHandlerFactory {
     private @NonNullByDefault({}) OAuthFactory oAuthFactory;
     private @NonNullByDefault({}) HttpClient httpClient;
 
+    private Map<ThingUID, ServiceRegistration<DiscoveryService>> discoveryServiceRegistrations = new HashMap<>();
+
     @Override
     public boolean supportsThingType(ThingTypeUID thingTypeUID) {
         return THING_TYPE_GBC_SOFTENER.equals(thingTypeUID) || THING_TYPE_GBC_BRIDGE.equals(thingTypeUID);
@@ -54,32 +59,25 @@ public class GruenbeckCloudHandlerFactory extends BaseThingHandlerFactory {
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
-     /*   if (THING_TYPE_GBC_SOFTENER.equals(thingTypeUID)) {
-            return new GruenbeckCloudHandler(thing);
-        } else */
+        if (THING_TYPE_GBC_SOFTENER.equals(thingTypeUID)) {
+            return new GruenbeckCloudSoftenerHandler(thing);
+        } else 
         if (THING_TYPE_GBC_BRIDGE.equals(thingTypeUID)) {
-            return new GruenbeckCloudBridgeHandler((Bridge) thing);
+            GruenbeckCloudBridgeHandler handler = new GruenbeckCloudBridgeHandler((Bridge) thing);
+            registerAccountDiscoveryService(handler);
+            return handler;
         }
 
         return null;
     }
 
+    private void registerAccountDiscoveryService(GruenbeckCloudBridgeHandler handler) {
+        GruenbeckCloudDiscoveryService discoveryService = new GruenbeckCloudDiscoveryService(handler);
 
-    @Reference
-    protected void setOAuthFactory(OAuthFactory oAuthFactory) {
-        this.oAuthFactory = oAuthFactory;
+        ServiceRegistration<DiscoveryService> serviceRegistration = this.bundleContext
+                .registerService(DiscoveryService.class, discoveryService, null);
+
+        discoveryServiceRegistrations.put(handler.getThing().getUID(), serviceRegistration);
     }
 
-    protected void unsetOAuthFactory(OAuthFactory oAuthFactory) {
-        this.oAuthFactory = null;
-    }
-
-    @Reference
-    protected void setHttpClientFactory(HttpClientFactory httpClientFactory) {
-        this.httpClient = httpClientFactory.getCommonHttpClient();
-    }
-
-    protected void unsetHttpClientFactory(HttpClientFactory httpClientFactory) {
-        this.httpClient = null;
-    }
 }
