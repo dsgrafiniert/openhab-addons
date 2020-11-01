@@ -12,13 +12,18 @@
  */
 package org.openhab.binding.gruenbeckcloud.internal.handler;
 
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
 import org.eclipse.smarthome.core.thing.ChannelUID;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingStatus;
 import org.eclipse.smarthome.core.thing.binding.BaseThingHandler;
 import org.eclipse.smarthome.core.types.Command;
-import org.jupnp.binding.xml.Descriptor.Device;
+import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBindingConstants;
+import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBridgeConfiguration;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudSoftenerConfiguration;
+import org.openhab.binding.gruenbeckcloud.internal.api.model.Device;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,26 +35,55 @@ import org.slf4j.LoggerFactory;
  */
 public class GruenbeckCloudSoftenerHandler extends BaseThingHandler {
 
-    private final Logger logger = LoggerFactory.getLogger(GruenbeckCloudSoftenerHandler.class);
+    private org.slf4j.Logger logger = LoggerFactory.getLogger(GruenbeckCloudSoftenerHandler.class);
+    private Device device;
+    private GruenbeckCloudBridgeHandler bridgeHandler;
+    private ScheduledFuture<?> refreshTask;
 
-    public GruenbeckCloudSoftenerHandler(Thing thing) {
+    public GruenbeckCloudSoftenerHandler(final Thing thing) {
         super(thing);
-        // TODO Auto-generated constructor stub
     }
 
     @Override
     public void initialize() {
-        // TODO Auto-generated method stub
         logger.debug("Start initializing!");
-        GruenbeckCloudSoftenerConfiguration config = getThing().getConfiguration().as(GruenbeckCloudSoftenerConfiguration.class);
-
+        final GruenbeckCloudSoftenerConfiguration config = getThing().getConfiguration()
+                .as(GruenbeckCloudSoftenerConfiguration.class);
         updateStatus(ThingStatus.ONLINE);
+        device = new Device(config);
+        final Thing thing = this.getThing();
+        logger.debug("Gruenbeck thingHandler thing: {}", config.toString());
+        bridgeHandler = (GruenbeckCloudBridgeHandler) getBridge().getHandler();
+        startAutomaticRefresh();
+
+    }
+
+    private void startAutomaticRefresh() {
+        final Runnable refresher = () -> refreshStateAndUpdate();
+        final GruenbeckCloudBridgeConfiguration bridgeConfig = bridgeHandler.getThing().getConfiguration()
+                .as(GruenbeckCloudBridgeConfiguration.class);
+        this.refreshTask = scheduler.scheduleWithFixedDelay(refresher, 0, bridgeConfig.refreshPeriod, TimeUnit.SECONDS);
+        logger.debug("Start automatic refresh at {} seconds", bridgeConfig.refreshPeriod);
+    }
+
+    private void refreshStateAndUpdate() {
+        bridgeHandler.getDeviceInformation(device);
+        bridgeHandler.negotiateWS(device);
     }
 
     @Override
-    public void handleCommand(ChannelUID channelUID, Command command) {
+    public void handleCommand(final ChannelUID channelUID, final Command command) {
         // TODO Auto-generated method stub
 
+    }
+
+    @Override
+    public void dispose() {
+        logger.debug("Running dispose()");
+        if (this.refreshTask != null) {
+            this.refreshTask.cancel(true);
+            this.refreshTask = null;
+        }
     }
 
 }

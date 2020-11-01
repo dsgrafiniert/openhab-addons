@@ -32,4 +32,9 @@ public class GruenbeckCloudSoftenerConfiguration {
     public String name;
     public Integer type;
     public boolean register;
+
+    @Override
+    public String toString() {
+        return "ID: "+ id +", name: "+name+", serialNumber: "+serialNumber;
+    }
 }

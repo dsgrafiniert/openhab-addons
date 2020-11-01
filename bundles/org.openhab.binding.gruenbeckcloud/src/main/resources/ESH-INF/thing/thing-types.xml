@@ -48,9 +48,14 @@
 		<description>Provides communication with Grünbeck Water Softener.</description>
 
 		<config-description>
-			<parameter name="serial" type="text" required="true">
+			<parameter name="serialNumber" type="text" required="true">
 				<label>Softener Serial</label>
 				<description>Serial number of the softener</description>
+			</parameter>
+
+			<parameter name="id" type="text" required="true">
+				<label>Softener ID</label>
+				<description>ID of the softener</description>
 			</parameter>
 
 			<parameter name="name" type="text" required="true">

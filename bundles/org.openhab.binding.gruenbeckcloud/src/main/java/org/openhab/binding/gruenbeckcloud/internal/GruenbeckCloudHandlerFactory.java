@@ -64,15 +64,15 @@ public class GruenbeckCloudHandlerFactory extends BaseThingHandlerFactory {
         } else 
         if (THING_TYPE_GBC_BRIDGE.equals(thingTypeUID)) {
             GruenbeckCloudBridgeHandler handler = new GruenbeckCloudBridgeHandler((Bridge) thing);
-            registerAccountDiscoveryService(handler);
+            registerAccountDiscoveryService(handler, (Bridge) thing);
             return handler;
         }
 
         return null;
     }
 
-    private void registerAccountDiscoveryService(GruenbeckCloudBridgeHandler handler) {
-        GruenbeckCloudDiscoveryService discoveryService = new GruenbeckCloudDiscoveryService(handler);
+    private void registerAccountDiscoveryService(GruenbeckCloudBridgeHandler handler, Bridge bridge) {
+        GruenbeckCloudDiscoveryService discoveryService = new GruenbeckCloudDiscoveryService(handler, bridge);
 
         ServiceRegistration<DiscoveryService> serviceRegistration = this.bundleContext
                 .registerService(DiscoveryService.class, discoveryService, null);

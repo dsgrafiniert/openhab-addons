@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.eclipse.smarthome.config.discovery.AbstractDiscoveryService;
 import org.eclipse.smarthome.config.discovery.DiscoveryResultBuilder;
+import org.eclipse.smarthome.core.thing.Bridge;
 import org.eclipse.smarthome.core.thing.ThingUID;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBindingConstants;
 import org.openhab.binding.gruenbeckcloud.internal.api.model.Device;
@@ -44,10 +45,11 @@ public class GruenbeckCloudDiscoveryService extends AbstractDiscoveryService {
 
     private ScheduledFuture<?> scanTask;
 
-    public GruenbeckCloudDiscoveryService(GruenbeckCloudBridgeHandler hBridgeHandler) {
+    public GruenbeckCloudDiscoveryService(GruenbeckCloudBridgeHandler hBridgeHandler, Bridge bridge) {
         super(GruenbeckCloudBindingConstants.DISCOVERABLE_THING_TYPE_UIDS, TIMEOUT);
         logger.debug("new GruenbeckCloud DiscoveryService instance created");
         this.handler = hBridgeHandler;
+        this.bridgeUID = bridge.getUID();
     }
 
     @Override

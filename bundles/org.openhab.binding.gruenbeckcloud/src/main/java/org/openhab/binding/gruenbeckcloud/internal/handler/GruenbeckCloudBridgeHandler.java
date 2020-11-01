@@ -14,6 +14,7 @@ package org.openhab.binding.gruenbeckcloud.internal.handler;
 
 import java.io.IOException;
 import java.net.HttpCookie;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -32,6 +33,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.HttpContentResponse;
@@ -44,7 +46,17 @@ import org.eclipse.jetty.client.util.FormContentProvider;
 import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.Fields;
+import org.eclipse.jetty.util.PathWatcher.EventListListener;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
+import org.eclipse.jetty.websocket.api.RemoteEndpoint;
+import org.eclipse.jetty.websocket.api.Session;
+import org.eclipse.jetty.websocket.api.StatusCode;
+import org.eclipse.jetty.websocket.api.annotations.OnWebSocketClose;
+import org.eclipse.jetty.websocket.api.annotations.OnWebSocketConnect;
+import org.eclipse.jetty.websocket.api.annotations.OnWebSocketError;
+import org.eclipse.jetty.websocket.api.annotations.OnWebSocketMessage;
+import org.eclipse.jetty.websocket.api.annotations.WebSocket;
+import org.eclipse.jetty.websocket.client.WebSocketClient;
 import org.eclipse.smarthome.core.thing.Bridge;
 import org.eclipse.smarthome.core.thing.ChannelUID;
 import org.eclipse.smarthome.core.thing.Thing;
@@ -56,6 +68,7 @@ import org.eclipse.smarthome.core.thing.binding.ThingHandlerCallback;
 import org.eclipse.smarthome.core.types.Command;
 import org.eclipse.smarthome.core.types.State;
 import org.eclipse.smarthome.io.net.http.HttpUtil;
+import org.eclipse.smarthome.io.net.http.WebSocketFactory;
 import org.ietf.jgss.GSSException;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBridgeConfiguration;
 import org.openhab.binding.gruenbeckcloud.internal.api.model.Device;
@@ -68,20 +81,23 @@ import org.slf4j.LoggerFactory;
  * 
  * @author Dominik Schön - Initial contribution
  */
+@NonNullByDefault
 public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
 
     private final Logger logger = LoggerFactory.getLogger(GruenbeckCloudBridgeHandler.class);
     private final SslContextFactory sslContextFactory = new SslContextFactory();
     private final HttpClient httpClient = new HttpClient(sslContextFactory);
     private @Nullable GruenbeckCloudBridgeConfiguration config;
-    private String csrf;
-    private String transId;
-    private String policy;
-    private String tenant;
+    private @Nullable String csrf;
+    private @Nullable String transId;
+    private @Nullable String policy;
+    private @Nullable String tenant;
 
-    private String accessToken;
-    private String refreshToken;
-    private ScheduledFuture<?> initializeTask;
+    private @Nullable String accessToken;
+    private @Nullable String refreshToken;
+    private @Nullable ScheduledFuture<?> initializeTask, heartbeatTask;
+
+    private @Nullable GruenbeckWebSocket gbWebsocket;
 
     public GruenbeckCloudBridgeHandler(Bridge bridge) {
         super(bridge);
@@ -89,20 +105,18 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
 
     @Override
     public void initialize() {
-        // TODO Auto-generated method stub
         logger.debug("Start initializing!");
         config = getConfigAs(GruenbeckCloudBridgeConfiguration.class);
-
-        updateStatus(ThingStatus.UNKNOWN);
 
         Runnable refresher = () -> asyncInitialize();
 
         this.initializeTask = scheduler.schedule(refresher, 2, TimeUnit.SECONDS);
-       
+
+        updateStatus(ThingStatus.ONLINE);
 
     }
 
-    private void asyncInitialize(){
+    private void asyncInitialize() {
         logger.debug("Start async initializing!");
 
         final CodeChallenge challenge = getCodeChallenge();
@@ -146,8 +160,6 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
             loginResponse = loginRequest.send();
             logger.debug("sendLoginRequest response headers: {}", loginResponse.getHeaders());
             logger.debug("sendLoginRequest Result from WS call: {}", loginResponse.getContentAsString());
-            updateStatus(ThingStatus.UNKNOWN);
-
             sendCombinedSigninAndSignup(challenge);
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
             // TODO Auto-generated catch block
@@ -160,10 +172,12 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
     private void sendCombinedSigninAndSignup(CodeChallenge challenge) {
         logger.debug("Start sendCombinedSigninAndSignup");
         httpClient.setFollowRedirects(false);
-        Request request = httpClient.newRequest("https://gruenbeckb2c.b2clogin.com" + tenant + "/api/CombinedSigninAndSignup/confirmed?csrf_token=" + csrf + "&tx=" + transId + "&p=" + policy );
+        Request request = httpClient.newRequest("https://gruenbeckb2c.b2clogin.com" + tenant
+                + "/api/CombinedSigninAndSignup/confirmed?csrf_token=" + csrf + "&tx=" + transId + "&p=" + policy);
         request.method(HttpMethod.GET);
         request.cookie(new HttpCookie("x-ms-cpim-csrf", csrf));
-        request.agent("Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.2 Mobile/15E148 Safari/604.1");
+        request.agent(
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.2 Mobile/15E148 Safari/604.1");
         request.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
 
         ContentResponse response = null;
@@ -171,33 +185,29 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
             logger.debug("sendCombinedSigninAndSignup headers {}", request.toString());
             response = request.send();
             logger.debug("sendCombinedSigninAndSignup response headers: {}", response.getHeaders());
-            logger.debug("sendCombinedSigninAndSignup {} Result from WS call: {}", response.getStatus() , response.getContentAsString());
+            logger.debug("sendCombinedSigninAndSignup {} Result from WS call: {}", response.getStatus(),
+                    response.getContentAsString());
             String resultString = response.getContentAsString();
             int start, end;
             start = resultString.indexOf("code%3d") + 7;
             end = resultString.indexOf(">here") - 1;
             String code = resultString.substring(start, end);
             logger.debug("code: {}", code);
-
-            updateStatus(ThingStatus.UNKNOWN);
-
             getTokens(challenge, code);
 
         } catch (Exception e) {
-        
+            logger.info("sendCombinedSigninAndSignup error during login: {}", e.getStackTrace().toString());
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR);
 
-                logger.info("sendCombinedSigninAndSignup error during login: {}", e.getStackTrace().toString());
-                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR);
-                      
         }
     }
 
     private void getTokens(CodeChallenge challenge, String code) {
         logger.debug("Start getTokens");
         httpClient.setFollowRedirects(false);
-        Request request = httpClient.newRequest("https://gruenbeckb2c.b2clogin.com" + tenant + "/oauth2/v2.0/token" );
+        Request request = httpClient.newRequest("https://gruenbeckb2c.b2clogin.com" + tenant + "/oauth2/v2.0/token");
         request.method(HttpMethod.POST);
-        
+
         request.agent("Gruenbeck/320 CFNetwork/978.0.7 Darwin/18.7.0");
         request.header("Host", "gruenbeckb2c.b2clogin.com");
         request.header("x-client-SKU", "MSAL.iOS");
@@ -218,7 +228,8 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
 
         Fields fields = new Fields();
         fields.add("client_info", "1");
-        fields.add("scope", "https://gruenbeckb2c.onmicrosoft.com/iot/user_impersonation openid profile offline_access");
+        fields.add("scope",
+                "https://gruenbeckb2c.onmicrosoft.com/iot/user_impersonation openid profile offline_access");
         fields.add("code", code);
         fields.add("grant_type", "authorization_code");
         fields.add("code_verifier", challenge.getResult());
@@ -234,7 +245,6 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
             JsonObject responseJSON = new Gson().fromJson(tokenResponse.getContentAsString(), JsonObject.class);
             accessToken = responseJSON.get("access_token").getAsString();
             refreshToken = responseJSON.get("refresh_token").getAsString();
-            updateStatus(ThingStatus.ONLINE);
 
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
             // TODO Auto-generated catch block
@@ -252,27 +262,26 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
                             + challenge.getHash()
                             + "&x-client-CPU=64&client-request-id=FDCD0F73-B7CD-4219-A29B-EE51A60FEE3E&redirect_uri=msal5a83cc16-ffb1-42e9-9859-9fbf07f36df8%3A%2F%2Fauth&client_id=5a83cc16-ffb1-42e9-9859-9fbf07f36df8&haschrome=1&return-client-request-id=true&x-client-DM=iPhone");
 
-                            String resultString = response.getContentAsString();
-                            int start, end;
-                            start = resultString.indexOf("csrf") + 7;
-                            end = resultString.indexOf(",", start) - 1;
-                            csrf = resultString.substring(start, end);
-                            start = resultString.indexOf("transId") + 10;
-                            end = resultString.indexOf(",", start) - 1;
-                            transId = resultString.substring(start, end);
-                            start = resultString.indexOf("policy") + 9;
-                            end = resultString.indexOf(",", start) - 1;
-                            policy = resultString.substring(start, end);
-                            start = resultString.indexOf("tenant") + 9;
-                            end = resultString.indexOf(",", start) - 1;
-                            tenant = resultString.substring(start, end); 
+            String resultString = response.getContentAsString();
+            int start, end;
+            start = resultString.indexOf("csrf") + 7;
+            end = resultString.indexOf(",", start) - 1;
+            csrf = resultString.substring(start, end);
+            start = resultString.indexOf("transId") + 10;
+            end = resultString.indexOf(",", start) - 1;
+            transId = resultString.substring(start, end);
+            start = resultString.indexOf("policy") + 9;
+            end = resultString.indexOf(",", start) - 1;
+            policy = resultString.substring(start, end);
+            start = resultString.indexOf("tenant") + 9;
+            end = resultString.indexOf(",", start) - 1;
+            tenant = resultString.substring(start, end);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
             logger.info("error during login: {}", e.getLocalizedMessage());
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR);
-       
+
         }
 
-            
     };
 
     private CodeChallenge getCodeChallenge() {
@@ -289,63 +298,8 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
             }
             httpClient.stop();
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             logger.error("Error while stopping httpClient: {}", e.getLocalizedMessage());
         }
-    }
-
-    @Override
-    public void setCallback(@Nullable final ThingHandlerCallback thingHandlerCallback) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void handleCommand(final ChannelUID channelUID, final Command command) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void handleUpdate(final ChannelUID channelUID, final State newState) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void handleConfigurationUpdate(final Map<String, Object> configurationParameters) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void thingUpdated(final Thing thing) {
-        // TODO Auto-generated method stub
-        initialize();
-
-    }
-
-    @Override
-    public void channelLinked(final ChannelUID channelUID) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void channelUnlinked(final ChannelUID channelUID) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void bridgeStatusChanged(final ThingStatusInfo bridgeStatusInfo) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void handleRemoval() {
-        super.handleRemoval();
     }
 
     private class CodeChallenge {
@@ -364,7 +318,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
                     result += chars[(int) Math.floor(Math.random() * charlength)];
                 result = Base64.getEncoder().encodeToString(result.getBytes());
                 result = result.replaceAll("=", "");
-                
+
                 MessageDigest digest;
                 try {
                     digest = MessageDigest.getInstance("SHA-256");
@@ -372,7 +326,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
                     hash = Base64.getEncoder().encodeToString(digest.digest());
                     logger.debug("hash: {}", hash);
                     logger.debug("result: {}", result);
-                    hash = hash.substring(0, hash.length()-1);
+                    hash = hash.substring(0, hash.length() - 1);
                     logger.debug("hash: {}", hash);
 
                 } catch (NoSuchAlgorithmException e) {
@@ -382,75 +336,183 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
             }
         }
 
-        public String getHash() { return hash; };
-        public String getResult(){ return result; };
+        public String getHash() {
+            return hash;
+        };
+
+        public String getResult() {
+            return result;
+        };
     }
-    
+
     public List<Device> getDecivesFromGruenbeckCloud() {
-
-        // const axiosConfig = {
-        //     "headers": {
-        //         "Host": "prod-eu-gruenbeck-api.azurewebsites.net",
-        //         "Accept": "application/json, text/plain, */*",
-        //         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
-        //         "Authorization": "Bearer " + accessToken,
-        //         "Accept-Language": "de-de",
-        //         "cache-control": "no-cache"
-        //     }
-        // };
-        // axios.get("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices", axiosConfig).then((response) => {
-        //     if (response.data && response.data.length > 0) {
-        //         try {
-        //             const device = response.data[0];
-        //             mgDeviceId = device.id;
-        //             this.setObjectNotExists(device.id, {
-        //                 type: "state",
-        //                 common: {
-        //                     name: device.name,
-        //                     role: "indicator",
-        //                     type: "mixed",
-        //                     write: false,
-        //                     read: true
-        //                 },
-        //                 native: {}
-        //             });
-
-        //             resolve();
-
-        //         } catch (error) {
-        //             this.log.error(error);
-        //             this.log.debug(response.data);
-        //             reject();
-        //         }
-
-        //     } else {
-        //         reject();
-        //     }
-        // });
         List<Device> devices = new ArrayList();
-        if (accessToken != null){
+        if (accessToken != null) {
             logger.debug("Start getDevicesFromGruenbeckCloud");
             httpClient.setFollowRedirects(false);
-            Request request = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices" );
+            Request request = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices");
             request.method(HttpMethod.GET);
-            request.agent("Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148");
+            request.agent(
+                    "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148");
             request.header("Accept", "application/json, text/plain, */*");
             request.header("Accept-Language", "de-de");
             request.header("Host", "prod-eu-gruenbeck-api.azurewebsites.net");
-            request.header("Authorization", "Bearer "+accessToken);
+            request.header("Authorization", "Bearer " + accessToken);
             request.header("cache-control", "no-cache");
 
             ContentResponse response = null;
             try {
-                logger.debug("sendCombinedSigninAndSignup headers {}", request.toString());
                 response = request.send();
                 logger.debug("response from getDevicesFromGruenbeckCloud {}", response.getContentAsString());
-                devices = new Gson().fromJson(response.getContentAsString(), new TypeToken<List<Device>>(){}.getType());
-            } catch(Exception e){
+                devices = new Gson().fromJson(response.getContentAsString(), new TypeToken<List<Device>>() {
+                }.getType());
+            } catch (Exception e) {
                 logger.debug("error during getDevicesFromGruenbeckCloud {}", e.getStackTrace().toString());
             }
         }
         return devices;
     }
-    
+
+    public void getDeviceInformation(Device device) {
+        if (accessToken != null) {
+            logger.debug("Start getDeviceInformation");
+            httpClient.setFollowRedirects(false);
+            Request request = httpClient
+                    .newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/" + device.getSerial());
+            request.method(HttpMethod.GET);
+            request.agent(
+                    "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148");
+            request.header("Accept", "application/json, text/plain, */*");
+            request.header("Accept-Language", "de-de");
+            request.header("Host", "prod-eu-gruenbeck-api.azurewebsites.net");
+            request.header("Authorization", "Bearer " + accessToken);
+            request.header("cache-control", "no-cache");
+
+            ContentResponse response = null;
+            try {
+                response = request.send();
+                logger.debug("response from getDeviceInformation {}", response.getContentAsString());
+            } catch (Exception e) {
+                logger.debug("error during getDeviceInformation {}", e.getStackTrace().toString());
+            }
+        }
+    }
+
+    @Override
+    public void handleCommand(ChannelUID channelUID, Command command) {
+
+    }
+
+    public void negotiateWS(Device device) {
+        if (accessToken != null && (gbWebsocket == null || !gbWebsocket.isRunning())) {
+            logger.debug("Start negotiateWS");
+            httpClient.setFollowRedirects(false);
+            Request request = httpClient
+                    .newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/realtime/negotiate");
+            request.method(HttpMethod.GET);
+            request.agent(
+                    "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148");
+            request.header("Content-Type", "text/plain;charset=UTF-8");
+            request.header("Origin", "file://");
+            request.header("Accept", "*/*");
+            request.header("Accept-Language", "de-de");
+            request.header("Authorization", "Bearer " + accessToken);
+            request.header("cache-control", "no-cache");
+
+            ContentResponse response = null;
+            try {
+                response = request.send();
+                JsonObject responseJsonObject = new Gson().fromJson(response.getContentAsString(), JsonObject.class);
+                String wsAccessToken = responseJsonObject.get("accessToken").getAsString();
+                Request request2 = httpClient.newRequest(
+                        "https://prod-eu-gruenbeck-signalr.service.signalr.net/client/negotiate?hub=gruenbeck");
+                request2.method(HttpMethod.POST);
+                request2.agent("Gruenbeck/349 CFNetwork/1197 Darwin/20.0.0");
+                request2.header("content-Type", "text/plain;charset=UTF-8");
+                request2.header("accept", "*/*");
+                request2.header("Accept-Language", "de-de");
+                request2.header("Authorization", "Bearer " + wsAccessToken);
+                request2.header("X-Requested-With", "XMLHttpRequest");
+                ContentResponse response2 = null;
+                response2 = request2.send();
+                JsonObject responseJsonObject2 = new Gson().fromJson(response2.getContentAsString(), JsonObject.class);
+                String wsConnectionId = responseJsonObject2.get("connectionId").getAsString();
+                if (gbWebsocket != null)
+                    gbWebsocket.stop();
+                gbWebsocket = null;
+                gbWebsocket = new GruenbeckWebSocket(wsConnectionId, wsAccessToken, device);
+                gbWebsocket.start();
+                // my $header = {
+                // "Content-Length" => 0,
+                // "Origin" => "file://",
+                // "Accept" => "*/*",
+                // "User-Agent" =>
+                // "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X)
+                // AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+                // "Authorization" => "Bearer " . $hash->{helper}{accessToken},
+                // "Accept-Language" => "de-de",
+                // "cache-control" => "no-cache"
+                // };
+                // my $param = {
+                // header => $header,
+                // url => "https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/"
+                // . ReadingsVal( $name, 'id', '' )
+                // . "/realtime/$type?api-version=2019-08-09",
+                // callback => \&parseRealtime,
+                // hash => $hash,
+                // method => "POST"
+                // };
+
+              
+                // Request request3 = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/" + device.getSerial()
+                // + "/realtime/enter?api-version=2019-08-09");
+
+                // request3.method(HttpMethod.POST);
+                // request3.agent(
+                //         "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148");
+                // request3.header("Content-Length", "0");
+                // request3.header("Origin", "file://");
+                // request3.header("Accept", "*/*");
+                // request3.header("Accept-Language", "de-de");
+                // request3.header("Authorization", "Bearer " + accessToken);
+                // request3.header("cache-control", "no-cache");
+                // ContentResponse response3 = null;
+                //     response3 = request3.send();
+                // logger.debug("response from realtime/enter {}", response3.getStatus());
+                // logger.debug("response from realtime/enter {}", response3.getContentAsString());
+
+
+            } catch (Exception e) {
+                logger.debug("error during negotiateWS {}", e.getStackTrace().toString());
+            }
+        } else {
+            logger.debug("negotiateWS wsSession already established");
+        }
+    }
+
+    private void asyncHeartbeat(String serial) {
+        
+        Request request3 = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/" + serial
+                + "/realtime/refresh?api-version=2020-04-07");
+        request3.method(HttpMethod.POST);
+        request3.agent(
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148");
+        request3.header("Content-Length", "0");
+        request3.header("Origin", "file://");
+        request3.header("Accept", "*/*");
+        request3.header("Accept-Language", "de-de");
+        request3.header("Authorization", "Bearer " + accessToken);
+        request3.header("cache-control", "no-cache");
+        ContentResponse response3 = null;
+        try {
+            response3 = request3.send();
+        logger.debug("response from asyncHeartbeat {}", response3.getStatus());
+        logger.debug("response from asyncHeartbeat {}", response3.getContentAsString());
+
+         } catch (Exception e) {
+        // TODO Auto-generated catch block
+            logger.debug("error during hearbeat {}", e.getMessage());
+        } 
+    }
+
 }

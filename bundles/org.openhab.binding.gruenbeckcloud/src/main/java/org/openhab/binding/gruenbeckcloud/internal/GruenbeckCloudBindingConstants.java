@@ -39,7 +39,7 @@ public class GruenbeckCloudBindingConstants {
 
 
     public static final String CONFIG_ID = "id";
-    public static final String CONFIG_SERIAL = "serial";
+    public static final String CONFIG_SERIAL = "serialNumber";
     public static final String CONFIG_NAME = "name";
     public static final String CONFIG_ERROR = "error";
 
