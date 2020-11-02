@@ -15,15 +15,23 @@ package org.openhab.binding.gruenbeckcloud.internal.handler;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.jdt.annotation.Nullable;
+import org.eclipse.smarthome.core.thing.Bridge;
 import org.eclipse.smarthome.core.thing.ChannelUID;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingStatus;
+import org.eclipse.smarthome.core.thing.ThingStatusDetail;
+import org.eclipse.smarthome.core.thing.ThingUID;
 import org.eclipse.smarthome.core.thing.binding.BaseThingHandler;
+import org.eclipse.smarthome.core.thing.binding.ThingHandler;
+import org.eclipse.smarthome.core.thing.binding.ThingHandlerCallback;
 import org.eclipse.smarthome.core.types.Command;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBindingConstants;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBridgeConfiguration;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudSoftenerConfiguration;
 import org.openhab.binding.gruenbeckcloud.internal.api.model.Device;
+import org.openhab.binding.gruenbeckcloud.internal.api.model.Event;
+import org.openhab.binding.gruenbeckcloud.internal.listener.DeviceStatusListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,9 +41,11 @@ import org.slf4j.LoggerFactory;
  * 
  * @author Dominik Schön - Initial contribution
  */
-public class GruenbeckCloudSoftenerHandler extends BaseThingHandler {
+public class GruenbeckCloudSoftenerHandler extends BaseThingHandler implements DeviceStatusListener {
 
-    private org.slf4j.Logger logger = LoggerFactory.getLogger(GruenbeckCloudSoftenerHandler.class);
+    private final org.slf4j.Logger logger = LoggerFactory.getLogger(GruenbeckCloudSoftenerHandler.class);
+    private final Object lock = new Object();
+
     private Device device;
     private GruenbeckCloudBridgeHandler bridgeHandler;
     private ScheduledFuture<?> refreshTask;
@@ -46,16 +56,48 @@ public class GruenbeckCloudSoftenerHandler extends BaseThingHandler {
 
     @Override
     public void initialize() {
+        initializeThing(getBridge() == null ? null : getBridge().getStatus());
+
         logger.debug("Start initializing!");
-        final GruenbeckCloudSoftenerConfiguration config = getThing().getConfiguration()
-                .as(GruenbeckCloudSoftenerConfiguration.class);
-        updateStatus(ThingStatus.ONLINE);
-        device = new Device(config);
-        final Thing thing = this.getThing();
-        logger.debug("Gruenbeck thingHandler thing: {}", config.toString());
+        
         bridgeHandler = (GruenbeckCloudBridgeHandler) getBridge().getHandler();
         startAutomaticRefresh();
 
+    }
+
+        /**
+     * Initializes the {@link Thing} corresponding to the given status of the bridge.
+     *
+     * @param bridgeStatus
+     */
+    private void initializeThing(@Nullable final ThingStatus bridgeStatus) {
+        logger.debug("initializeThing thing {} bridge status {}", getThing().getUID(), bridgeStatus);
+        final GruenbeckCloudSoftenerConfiguration config = getThing().getConfiguration()
+                .as(GruenbeckCloudSoftenerConfiguration.class);
+        
+        if (config != null) {
+            device = new Device(config);
+            final Thing thing = this.getThing();
+            logger.debug("Gruenbeck thingHandler thing: {}", config.toString());
+            // note: this call implicitly registers our handler as a listener on
+            // the bridge
+            if (getGruenbeckCloudBridgeHandler() != null) {
+                if (bridgeStatus == ThingStatus.ONLINE) {
+                   // if (initializeProperties()) {
+                        updateStatus(ThingStatus.ONLINE);
+                   // } else {
+                   //     updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.GONE,
+                   //             "Device not found in GruenbeckCloud config. Was it removed?");
+                   // }
+                } else {
+                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
+                }
+            } else {
+                updateStatus(ThingStatus.OFFLINE);
+            }
+        } else {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "device id unknown");
+        }
     }
 
     private void startAutomaticRefresh() {
@@ -77,6 +119,26 @@ public class GruenbeckCloudSoftenerHandler extends BaseThingHandler {
 
     }
 
+    private @Nullable GruenbeckCloudBridgeHandler getGruenbeckCloudBridgeHandler() {
+        synchronized (this.lock) {
+            if (this.bridgeHandler == null) {
+                final Bridge bridge = getBridge();
+                if (bridge == null) {
+                    return null;
+                }
+                final ThingHandler handler = bridge.getHandler();
+                if (handler instanceof GruenbeckCloudBridgeHandler) {
+                    this.bridgeHandler = (GruenbeckCloudBridgeHandler) handler;
+                    this.bridgeHandler.registerDeviceStatusListener(this);
+                } else {
+                    return null;
+                }
+            }
+            return this.bridgeHandler;
+        }
+    }
+
+
     @Override
     public void dispose() {
         logger.debug("Running dispose()");
@@ -84,6 +146,21 @@ public class GruenbeckCloudSoftenerHandler extends BaseThingHandler {
             this.refreshTask.cancel(true);
             this.refreshTask = null;
         }
+        if (bridgeHandler != null) {
+            bridgeHandler.unregisterDeviceStatusListener(this);
+        }
+    }
+    
+    @Override
+    public void onDeviceStateChanged(final Device _device) {
+        // TODO Auto-generated method stub
+    }
+
+    @Override
+    public void onDeviceStateChanged(final Device _device, final Event _event) {
+        // TODO Auto-generated method stub
+        logger.debug("deviceStateChanged: {}, Event {}", _device, _event);
+
     }
 
 }

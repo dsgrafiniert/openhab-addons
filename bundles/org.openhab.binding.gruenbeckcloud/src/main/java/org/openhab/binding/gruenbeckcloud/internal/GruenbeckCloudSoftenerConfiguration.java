@@ -32,6 +32,7 @@ public class GruenbeckCloudSoftenerConfiguration {
     public String name;
     public Integer type;
     public boolean register;
+    public String series;
 
     @Override
     public String toString() {

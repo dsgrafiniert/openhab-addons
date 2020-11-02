@@ -58,6 +58,11 @@
 				<description>ID of the softener</description>
 			</parameter>
 
+			<parameter name="series" type="text" required="true">
+				<label>Softener Series</label>
+				<description>Series of the softener</description>
+			</parameter>
+
 			<parameter name="name" type="text" required="true">
 				<label>Device Name</label>
 				<description>Name of the softener as provided in myProduct App</description>

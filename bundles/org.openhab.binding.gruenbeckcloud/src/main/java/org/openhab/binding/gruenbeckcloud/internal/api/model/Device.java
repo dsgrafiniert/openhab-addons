@@ -24,6 +24,7 @@ import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudSoftenerConfigu
 public class Device {
 
     private String id;
+    private String series;
 
     private String serialNumber;
 
@@ -99,6 +100,7 @@ public class Device {
 
     public Device(GruenbeckCloudSoftenerConfiguration config) {
         this.id = config.id;
+        this.series = config.series;
         this.serialNumber = config.serialNumber;
         this.error = config.error;
         this.name = config.name;
@@ -124,6 +126,10 @@ public class Device {
 
     public Integer getType() {
         return type;
+    }
+
+    public String getSeries(){
+        return series;
     }
 
 }

@@ -31,6 +31,7 @@ import org.eclipse.jetty.websocket.api.annotations.WebSocket;
 import org.eclipse.jetty.websocket.api.extensions.Frame;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
 import org.openhab.binding.gruenbeckcloud.internal.api.model.Device;
+import org.openhab.binding.gruenbeckcloud.internal.listener.EventListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,15 +53,18 @@ public class GruenbeckWebSocket {
     private final Device device;
     private final String websocketAuthToken;
     private final String websocketId;
+    private final EventListener eventListener;
 
     private @Nullable Session session;
     private @Nullable WebSocketClient client;
     private boolean closing;
 
-    public GruenbeckWebSocket(final String wsConnectionId, final String wsAccessToken, final Device device2) {
+    public GruenbeckWebSocket(final EventListener evListener, final String wsConnectionId, final String wsAccessToken,
+            final Device device2) {
         websocketAuthToken = wsAccessToken;
         websocketId = wsConnectionId;
         device = device2;
+        eventListener = evListener;
     }
 
     /**
@@ -74,7 +78,7 @@ public class GruenbeckWebSocket {
         if (client == null || client.isStopped()) {
             client = new WebSocketClient(sslContextFactory);
             client.setMaxIdleTimeout(this.maxIdleTimeout);
-            client.setMaxTextMessageBufferSize(64*1024);
+            client.setMaxTextMessageBufferSize(64 * 1024);
             client.start();
         }
 
@@ -118,29 +122,28 @@ public class GruenbeckWebSocket {
         this.closing = false;
         logger.info("Connected to Gruenbeck Webservice.");
         logger.debug("Gruenbeck Websocket session: {}", session);
-        final String initialMessage = "{\"protocol\":\"json\", \"version\":1 }"+record_separator;
+        final String initialMessage = "{\"protocol\":\"json\", \"version\":1 }" + record_separator;
         logger.debug(initialMessage);
         try {
-            session.getRemote().sendString(initialMessage, new WriteCallback(){
-            
+            session.getRemote().sendString(initialMessage, new WriteCallback() {
+
                 @Override
                 public void writeSuccess() {
                     // TODO Auto-generated method stub
                     logger.debug("write success");
 
                 }
-            
+
                 @Override
                 public void writeFailed(@Nullable Throwable xt) {
                     logger.debug("write failes {}", xt.getLocalizedMessage());
 
-                    
                 }
             });
             Future<Void> future = session.getRemote().sendStringByFuture(initialMessage);
             future.get(2, TimeUnit.SECONDS); // wait for send to complete.
 
-            while (!future.isDone()){
+            while (!future.isDone()) {
                 logger.debug("still sending");
 
             }
@@ -154,7 +157,7 @@ public class GruenbeckWebSocket {
     public void onClose(final int statusCode, final String reason) {
         if (statusCode == StatusCode.NORMAL) {
             logger.info("Connection to Gruenbeck Webservice was closed normally. (code: {}). Reason: {}", statusCode,
-            reason);
+                    reason);
         } else {
             logger.info("Connection to Gruenbeck Webservice was closed abnormally (code: {}). Reason: {}", statusCode,
                     reason);
@@ -165,7 +168,8 @@ public class GruenbeckWebSocket {
     @OnWebSocketError
     public void onError(final Throwable cause) {
         logger.debug("Gruenbeck WebSocket onError() - {}", cause.getMessage());
-        // eventListener.onError(cause);
+        eventListener.onError(cause);
+        
     }
 
     @OnWebSocketMessage
@@ -174,13 +178,20 @@ public class GruenbeckWebSocket {
         if (closing) {
             logger.debug("Gruenbeck WebSocket onMessage() - ignored, WebSocket is closing...");
         } else {
-        //  eventListener.onEvent(msg);
+            try{
+               String msg_stripped = msg.trim().replaceAll("\r\n", "\n").replaceAll("\r", "\n").replaceAll("[\\p{Cc}\\p{Cf}\\p{Co}\\p{Cn}&&[^\\s]]", "");
+          eventListener.onEvent(msg_stripped, device);
+            } catch (Exception e) {
+                logger.debug("Gruenbeck WebSocket onMessage() error - {}", e.getMessage());
+
+            }
         }
     }
 
     @OnWebSocketFrame
-    public void onFrame(Session session, Frame frame){
-        logger.debug("frame {}", frame);
+    public void onFrame(final Frame frame){
+        logger.debug("onFrame: {}", frame);
     }
+
 
 }

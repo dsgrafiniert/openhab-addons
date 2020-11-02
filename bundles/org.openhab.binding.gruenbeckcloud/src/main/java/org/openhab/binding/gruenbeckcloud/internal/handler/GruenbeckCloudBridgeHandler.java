@@ -24,12 +24,15 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 
@@ -72,6 +75,9 @@ import org.eclipse.smarthome.io.net.http.WebSocketFactory;
 import org.ietf.jgss.GSSException;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBridgeConfiguration;
 import org.openhab.binding.gruenbeckcloud.internal.api.model.Device;
+import org.openhab.binding.gruenbeckcloud.internal.api.model.Event;
+import org.openhab.binding.gruenbeckcloud.internal.listener.DeviceStatusListener;
+import org.openhab.binding.gruenbeckcloud.internal.listener.EventListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +88,7 @@ import org.slf4j.LoggerFactory;
  * @author Dominik Schön - Initial contribution
  */
 @NonNullByDefault
-public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
+public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements EventListener{
 
     private final Logger logger = LoggerFactory.getLogger(GruenbeckCloudBridgeHandler.class);
     private final SslContextFactory sslContextFactory = new SslContextFactory();
@@ -96,6 +102,9 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
     private @Nullable String accessToken;
     private @Nullable String refreshToken;
     private @Nullable ScheduledFuture<?> initializeTask, heartbeatTask;
+
+    private final Set<DeviceStatusListener> deviceStatusListeners = new CopyOnWriteArraySet<>();
+
 
     private @Nullable GruenbeckWebSocket gbWebsocket;
 
@@ -440,7 +449,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
                 if (gbWebsocket != null)
                     gbWebsocket.stop();
                 gbWebsocket = null;
-                gbWebsocket = new GruenbeckWebSocket(wsConnectionId, wsAccessToken, device);
+                gbWebsocket = new GruenbeckWebSocket(this, wsConnectionId, wsAccessToken, device);
                 gbWebsocket.start();
                 // my $header = {
                 // "Content-Length" => 0,
@@ -464,22 +473,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
                 // };
 
               
-                // Request request3 = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/" + device.getSerial()
-                // + "/realtime/enter?api-version=2019-08-09");
-
-                // request3.method(HttpMethod.POST);
-                // request3.agent(
-                //         "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148");
-                // request3.header("Content-Length", "0");
-                // request3.header("Origin", "file://");
-                // request3.header("Accept", "*/*");
-                // request3.header("Accept-Language", "de-de");
-                // request3.header("Authorization", "Bearer " + accessToken);
-                // request3.header("cache-control", "no-cache");
-                // ContentResponse response3 = null;
-                //     response3 = request3.send();
-                // logger.debug("response from realtime/enter {}", response3.getStatus());
-                // logger.debug("response from realtime/enter {}", response3.getContentAsString());
+                 
 
 
             } catch (Exception e) {
@@ -488,12 +482,31 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
         } else {
             logger.debug("negotiateWS wsSession already established");
         }
+        try {
+
+        Request request3 = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/" +device.getSeries()+"/" + device.getSerial()
+                 + "/realtime/enter");
+
+                 request3.method(HttpMethod.POST);
+                 request3.agent(
+                         "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148");
+                 request3.header("Content-Length", "0");
+                 request3.header("Origin", "file://");
+                 request3.header("Accept", "*/*");
+                 request3.header("Accept-Language", "de-de");
+                 request3.header("Authorization", "Bearer " + accessToken);
+                 request3.header("cache-control", "no-cache");
+                 ContentResponse response3 = null;
+                     response3 = request3.send();
+                 logger.debug("response from realtime/enter {}", response3.getStatus());
+                 logger.debug("response from realtime/enter {}", response3.getContentAsString());
+                } catch (Exception e) {
+                    logger.debug("error during realtime/enter {}", e.getStackTrace().toString());
+                }
     }
 
-    private void asyncHeartbeat(String serial) {
-        
-        Request request3 = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/" + serial
-                + "/realtime/refresh?api-version=2020-04-07");
+    private void asyncHeartbeat(String series, String serial) {
+        Request request3 = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/"+ series +"/" + serial + "/realtime/refresh");
         request3.method(HttpMethod.POST);
         request3.agent(
                 "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148");
@@ -503,6 +516,8 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
         request3.header("Accept-Language", "de-de");
         request3.header("Authorization", "Bearer " + accessToken);
         request3.header("cache-control", "no-cache");
+        logger.debug("request to asyncHeartbeat {}", request3.toString());
+
         ContentResponse response3 = null;
         try {
             response3 = request3.send();
@@ -513,6 +528,56 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler {
         // TODO Auto-generated catch block
             logger.debug("error during hearbeat {}", e.getMessage());
         } 
+    }
+
+    /**
+     * Registers a {@link DeviceStatusListener}.
+     *
+     * @param deviceStatusListener
+     * @return true, if successful
+     */
+    public boolean registerDeviceStatusListener(final DeviceStatusListener deviceStatusListener) {
+        return deviceStatusListeners.add(deviceStatusListener);
+    }
+
+    /**
+     * Unregisters a {@link DeviceStatusListener}.
+     *
+     * @param deviceStatusListener
+     * @return true, if successful
+     */
+    public boolean unregisterDeviceStatusListener(final DeviceStatusListener deviceStatusListener) {
+        return deviceStatusListeners.remove(deviceStatusListener);
+    }
+
+    @Override
+    public void onEvent(String msg, Device device) {
+        // TODO Auto-generated method stub
+        logger.debug("eventListener: String \"{}\"", msg);
+
+        Event e = new Event(msg);
+        asyncHeartbeat(device.getSeries(), device.getId());
+
+        //TODO: Retrieve device from Event or Message
+        
+        if (e.getType() == 1){
+            for (DeviceStatusListener listener : deviceStatusListeners){
+                listener.onDeviceStateChanged(device, e);
+            }
+        }
+
+    }
+
+    @Override
+    public void onError(Throwable cause) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void connectionClosed() {
+        // TODO Auto-generated method stub
+
     }
 
 }

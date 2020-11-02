@@ -40,11 +40,13 @@ public class GruenbeckCloudBindingConstants {
 
     public static final String CONFIG_ID = "id";
     public static final String CONFIG_SERIAL = "serialNumber";
+    public static final String CONFIG_SERIES = "series";
+
     public static final String CONFIG_NAME = "name";
     public static final String CONFIG_ERROR = "error";
 
     // List of all Channel ids
-    public static final String CHANNEL_1 = "channel1";
+    public static final String CHANNEL_CURRENT_FLOW = "channelcurrentflow";
 
        // Authorization related Servlet and resources aliases.
        public static final String GBC_ALIAS = "/connectgruenbeckcloud";
