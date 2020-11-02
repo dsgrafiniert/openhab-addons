@@ -19,5 +19,5 @@ jobs:
       with:
         java-version: 1.8
     - name: Build with Maven
-      run: mvn deploy -Dregistry=https://maven.pkg.github.com/dsgrafiniert -Dtoken=ce7254447fac50a97970c9bc114b4189df4eeb0e --file bundles/org.openhab.binding.gruenbeckcloud/pom.xml
+      run: mvn deploy -Dregistry=https://maven.pkg.github.com/dsgrafiniert -Dtoken=GH_TOKEN --file bundles/org.openhab.binding.gruenbeckcloud/pom.xml
     
