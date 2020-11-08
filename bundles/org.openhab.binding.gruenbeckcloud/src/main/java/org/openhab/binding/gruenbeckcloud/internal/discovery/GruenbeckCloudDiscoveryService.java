@@ -91,6 +91,7 @@ public class GruenbeckCloudDiscoveryService extends AbstractDiscoveryService {
         ThingUID thingUID = new ThingUID(GruenbeckCloudBindingConstants.THING_TYPE_GBC_SOFTENER, device.getSerial());
       //  properties.put(NeatoBindingConstants.CONFIG_SECRET, robot.getSecretKey());
         properties.put(GruenbeckCloudBindingConstants.CONFIG_SERIAL, device.getSerial());
+        properties.put(GruenbeckCloudBindingConstants.CONFIG_SERIES, device.getSeries());
         properties.put(GruenbeckCloudBindingConstants.CONFIG_ID, device.getId());
         properties.put(GruenbeckCloudBindingConstants.CONFIG_NAME, device.getName());
 

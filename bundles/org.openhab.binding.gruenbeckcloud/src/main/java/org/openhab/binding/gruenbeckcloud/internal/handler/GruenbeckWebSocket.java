@@ -86,7 +86,7 @@ public class GruenbeckWebSocket {
             session.close();
         }
 
-        logger.debug("Connecting to Gruenbeck WebSocket...");
+        logger.info("Connecting to Gruenbeck WebSocket...");
         session = client.connect(this,
                 URI.create("wss://prod-eu-gruenbeck-signalr.service.signalr.net/client/?hub=gruenbeck&id=" + websocketId
                         + "&access_token=" + websocketAuthToken))
@@ -99,7 +99,7 @@ public class GruenbeckWebSocket {
     public synchronized void stop() {
         this.closing = true;
         if (isRunning()) {
-            logger.debug("Closing session...");
+            logger.info("Closing session...");
             session.close();
             session = null;
         } else {
@@ -149,7 +149,7 @@ public class GruenbeckWebSocket {
             }
         } catch (final Exception e) {
             // TODO Auto-generated catch block
-            logger.debug("error during sendString - {}", e.getLocalizedMessage());
+            logger.error("error during sendString - {}", e.getLocalizedMessage());
         }
     }
 
@@ -167,7 +167,7 @@ public class GruenbeckWebSocket {
 
     @OnWebSocketError
     public void onError(final Throwable cause) {
-        logger.debug("Gruenbeck WebSocket onError() - {}", cause.getMessage());
+        logger.error("Gruenbeck WebSocket onError() - {}", cause.getMessage());
         eventListener.onError(cause);
         
     }

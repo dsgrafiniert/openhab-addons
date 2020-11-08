@@ -92,7 +92,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
 
     private final Logger logger = LoggerFactory.getLogger(GruenbeckCloudBridgeHandler.class);
     private final SslContextFactory sslContextFactory = new SslContextFactory();
-    private final HttpClient httpClient = new HttpClient(sslContextFactory);
+    private @Nullable HttpClient httpClient;
     private @Nullable GruenbeckCloudBridgeConfiguration config;
     private @Nullable String csrf;
     private @Nullable String transId;
@@ -102,6 +102,8 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
     private @Nullable String accessToken;
     private @Nullable String refreshToken;
     private @Nullable ScheduledFuture<?> initializeTask, heartbeatTask;
+
+    private long lastUpdate;
 
     private final Set<DeviceStatusListener> deviceStatusListeners = new CopyOnWriteArraySet<>();
 
@@ -114,38 +116,42 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
 
     @Override
     public void initialize() {
-        logger.debug("Start initializing!");
+        logger.info("Start initializing!");
+        lastUpdate = System.currentTimeMillis();
         config = getConfigAs(GruenbeckCloudBridgeConfiguration.class);
-
+        httpClient = new HttpClient(sslContextFactory);
         Runnable refresher = () -> asyncInitialize();
 
-        this.initializeTask = scheduler.schedule(refresher, 2, TimeUnit.SECONDS);
+        this.initializeTask = scheduler.schedule(refresher, 20, TimeUnit.SECONDS);
 
         updateStatus(ThingStatus.ONLINE);
 
     }
 
     private void asyncInitialize() {
-        logger.debug("Start async initializing!");
+        logger.info("Start async initializing!");
 
         final CodeChallenge challenge = getCodeChallenge();
         // Instantiate and configure the SslContextFactory
 
         // Instantiate HttpClient with the SslContextFactory
         try {
+            if (httpClient == null)
+                httpClient = new HttpClient(sslContextFactory);
+ 
             httpClient.start();
 
             initializeHttpClient(challenge);
             sendLoginRequest(challenge);
 
         } catch (Exception e) {
-            logger.debug("initialize Error during HTTP communication", e);
+            logger.error("initialize Error during HTTP communication", e);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR);
         }
     }
 
     private void sendLoginRequest(CodeChallenge challenge) {
-        logger.debug("Start sendLoginRequest");
+        logger.info("Start sendLoginRequest");
         Request loginRequest = httpClient.newRequest(
                 "https://gruenbeckb2c.b2clogin.com" + tenant + "/SelfAsserted?tx=" + transId + "&p=" + policy);
         loginRequest.method(HttpMethod.POST);
@@ -172,14 +178,14 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
             sendCombinedSigninAndSignup(challenge);
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
             // TODO Auto-generated catch block
-            logger.info("sendLoginRequest error during login: {}", e.getLocalizedMessage());
+            logger.error("sendLoginRequest error during login: {}", e.getLocalizedMessage());
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR);
         }
 
     }
 
     private void sendCombinedSigninAndSignup(CodeChallenge challenge) {
-        logger.debug("Start sendCombinedSigninAndSignup");
+        logger.info("Start sendCombinedSigninAndSignup");
         httpClient.setFollowRedirects(false);
         Request request = httpClient.newRequest("https://gruenbeckb2c.b2clogin.com" + tenant
                 + "/api/CombinedSigninAndSignup/confirmed?csrf_token=" + csrf + "&tx=" + transId + "&p=" + policy);
@@ -205,14 +211,14 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
             getTokens(challenge, code);
 
         } catch (Exception e) {
-            logger.info("sendCombinedSigninAndSignup error during login: {}", e.getStackTrace().toString());
+            logger.error("sendCombinedSigninAndSignup error during login: {}", e.getStackTrace().toString());
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR);
 
         }
     }
 
     private void getTokens(CodeChallenge challenge, String code) {
-        logger.debug("Start getTokens");
+        logger.info("Start getTokens");
         httpClient.setFollowRedirects(false);
         Request request = httpClient.newRequest("https://gruenbeckb2c.b2clogin.com" + tenant + "/oauth2/v2.0/token");
         request.method(HttpMethod.POST);
@@ -257,7 +263,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
 
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
             // TODO Auto-generated catch block
-            logger.info("getTokens error during login: {}", e.getLocalizedMessage());
+            logger.error("getTokens error during login: {}", e.getLocalizedMessage());
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR);
         }
 
@@ -265,6 +271,8 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
 
     private void initializeHttpClient(CodeChallenge challenge) {
         ContentResponse response;
+        logger.info("Start initializeHttpClient");
+
         try {
             response = httpClient.GET(
                     "https://gruenbeckb2c.b2clogin.com/a50d35c1-202f-4da7-aa87-76e51a3098c6/b2c_1_signinup/oauth2/v2.0/authorize?state=NzZDNkNBRkMtOUYwOC00RTZBLUE5MkYtQTNFRDVGNTQ3MUNG&x-client-Ver=0.2.2&prompt=select_account&response_type=code&code_challenge_method=S256&x-client-OS=12.4.1&scope=https%3A%2F%2Fgruenbeckb2c.onmicrosoft.com%2Fiot%2Fuser_impersonation+openid+profile+offline_access&x-client-SKU=MSAL.iOS&code_challenge="
@@ -286,7 +294,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
             end = resultString.indexOf(",", start) - 1;
             tenant = resultString.substring(start, end);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
-            logger.info("error during login: {}", e.getLocalizedMessage());
+            logger.error("error during login: {}", e.getLocalizedMessage());
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR);
 
         }
@@ -300,6 +308,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
     @Override
     public void dispose() {
         super.dispose();
+        logger.info("dispose GruenbeckCloudBridgeHandler");
         try {
             if (this.initializeTask != null) {
                 this.initializeTask.cancel(true);
@@ -316,6 +325,8 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
         private String result;
 
         public CodeChallenge() {
+            logger.info("Start CodeChallenge");
+
             hash = "";
             result = "";
             char[] chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray();
@@ -340,7 +351,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
 
                 } catch (NoSuchAlgorithmException e) {
                     // TODO Auto-generated catch block
-                    logger.error("Error: {}", e.getMessage());
+                    logger.error("Error in CodeChallenge: {}", e.getMessage());
                 }
             }
         }
@@ -357,7 +368,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
     public List<Device> getDecivesFromGruenbeckCloud() {
         List<Device> devices = new ArrayList();
         if (accessToken != null) {
-            logger.debug("Start getDevicesFromGruenbeckCloud");
+            logger.info("Start getDevicesFromGruenbeckCloud");
             httpClient.setFollowRedirects(false);
             Request request = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices");
             request.method(HttpMethod.GET);
@@ -376,7 +387,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
                 devices = new Gson().fromJson(response.getContentAsString(), new TypeToken<List<Device>>() {
                 }.getType());
             } catch (Exception e) {
-                logger.debug("error during getDevicesFromGruenbeckCloud {}", e.getStackTrace().toString());
+                logger.error("error during getDevicesFromGruenbeckCloud {}", e.getStackTrace().toString());
             }
         }
         return devices;
@@ -384,7 +395,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
 
     public void getDeviceInformation(Device device) {
         if (accessToken != null) {
-            logger.debug("Start getDeviceInformation");
+            logger.info("Start getDeviceInformation");
             httpClient.setFollowRedirects(false);
             Request request = httpClient
                     .newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/" + device.getSerial());
@@ -402,7 +413,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
                 response = request.send();
                 logger.debug("response from getDeviceInformation {}", response.getContentAsString());
             } catch (Exception e) {
-                logger.debug("error during getDeviceInformation {}", e.getStackTrace().toString());
+                logger.error("error during getDeviceInformation {}", e.getStackTrace().toString());
             }
         }
     }
@@ -473,18 +484,28 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
                 // };
 
               
-                 
+                enterRealtime(device.getSeries(), device.getSerial());
 
 
             } catch (Exception e) {
-                logger.debug("error during negotiateWS {}", e.getStackTrace().toString());
+                logger.error("error during negotiateWS {}", e.getStackTrace().toString());
             }
         } else {
-            logger.debug("negotiateWS wsSession already established");
+            logger.info("negotiateWS wsSession already established");
         }
-        try {
+        if (lastUpdate < System.currentTimeMillis()-60000){
+            logger.info("lastUpdate at lease 60 sec ago. Entering Realtime again");
+            enterRealtime(device.getSeries(), device.getSerial());
+        }
+        asyncHeartbeat(device.getSeries(), device.getId());
 
-        Request request3 = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/" +device.getSeries()+"/" + device.getSerial()
+    }
+
+    private void enterRealtime (String series, String serial){
+        try {
+            logger.info("enterRealtime");
+
+            Request request3 = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/" +series+"/" + serial
                  + "/realtime/enter");
 
                  request3.method(HttpMethod.POST);
@@ -500,12 +521,14 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
                      response3 = request3.send();
                  logger.debug("response from realtime/enter {}", response3.getStatus());
                  logger.debug("response from realtime/enter {}", response3.getContentAsString());
-                } catch (Exception e) {
-                    logger.debug("error during realtime/enter {}", e.getStackTrace().toString());
-                }
+        } catch (Exception e) {
+            logger.error("error during realtime/enter {}", e.getLocalizedMessage());
+        }
     }
 
     private void asyncHeartbeat(String series, String serial) {
+        logger.info("refeshRealtime // heartbeat");
+
         Request request3 = httpClient.newRequest("https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/"+ series +"/" + serial + "/realtime/refresh");
         request3.method(HttpMethod.POST);
         request3.agent(
@@ -526,7 +549,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
 
          } catch (Exception e) {
         // TODO Auto-generated catch block
-            logger.debug("error during hearbeat {}", e.getMessage());
+            logger.error("error during hearbeat {}", e.getLocalizedMessage());
         } 
     }
 
@@ -556,12 +579,16 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
         logger.debug("eventListener: String \"{}\"", msg);
 
         Event e = new Event(msg);
-        asyncHeartbeat(device.getSeries(), device.getId());
 
         //TODO: Retrieve device from Event or Message
-        
+        logger.debug("eventListener: Event {}", e.toString());
+
         if (e.getType() == 1){
+            logger.debug("eventListener: type 1");
+            lastUpdate = System.currentTimeMillis();
+
             for (DeviceStatusListener listener : deviceStatusListeners){
+                
                 listener.onDeviceStateChanged(device, e);
             }
         }

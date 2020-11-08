@@ -26,6 +26,8 @@ import org.eclipse.smarthome.core.thing.binding.BaseThingHandler;
 import org.eclipse.smarthome.core.thing.binding.ThingHandler;
 import org.eclipse.smarthome.core.thing.binding.ThingHandlerCallback;
 import org.eclipse.smarthome.core.types.Command;
+import org.eclipse.smarthome.core.library.types.DecimalType;
+
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBindingConstants;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBridgeConfiguration;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudSoftenerConfiguration;
@@ -71,7 +73,7 @@ public class GruenbeckCloudSoftenerHandler extends BaseThingHandler implements D
      * @param bridgeStatus
      */
     private void initializeThing(@Nullable final ThingStatus bridgeStatus) {
-        logger.debug("initializeThing thing {} bridge status {}", getThing().getUID(), bridgeStatus);
+        logger.info("initializeThing thing {} bridge status {}", getThing().getUID(), bridgeStatus);
         final GruenbeckCloudSoftenerConfiguration config = getThing().getConfiguration()
                 .as(GruenbeckCloudSoftenerConfiguration.class);
         
@@ -159,8 +161,16 @@ public class GruenbeckCloudSoftenerHandler extends BaseThingHandler implements D
     @Override
     public void onDeviceStateChanged(final Device _device, final Event _event) {
         // TODO Auto-generated method stub
-        logger.debug("deviceStateChanged: {}, Event {}", _device, _event);
+        logger.info("deviceStateChanged: {}, Event {}", _device, _event.getValues());
+        for (String key : _event.getValues().keySet()){
+            try {
+                logger.debug("deviceStateChanged: {}:{} - {}", key, (Double)_event.getValues().get(key), new DecimalType((Double)_event.getValues().get(key)));
+                updateState(key, new DecimalType((Double)_event.getValues().get(key)));
+            } catch (Exception e){
+                logger.error("deviceStateChanged: {}:{}, error {}", key, _event.getValues().get(key), e.getMessage());
 
+            }
+        }
     }
 
 }
