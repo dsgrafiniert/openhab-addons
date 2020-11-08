@@ -46,6 +46,8 @@ import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.api.Response.ContentListener;
 import org.eclipse.jetty.client.util.FormContentProvider;
+import org.eclipse.jetty.client.util.StringContentProvider;
+
 import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.Fields;
@@ -101,7 +103,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
 
     private @Nullable String accessToken;
     private @Nullable String refreshToken;
-    private @Nullable ScheduledFuture<?> initializeTask, heartbeatTask;
+    private @Nullable ScheduledFuture<?> initializeTask, heartbeatTask, refreshTokenTask;
 
     private long lastUpdate;
 
@@ -260,10 +262,56 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
             JsonObject responseJSON = new Gson().fromJson(tokenResponse.getContentAsString(), JsonObject.class);
             accessToken = responseJSON.get("access_token").getAsString();
             refreshToken = responseJSON.get("refresh_token").getAsString();
+            Runnable refresher = () -> refreshTokens();
+
+            this.refreshTokenTask = scheduler.schedule(refresher, 300, TimeUnit.SECONDS);
+    
 
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
             // TODO Auto-generated catch block
             logger.error("getTokens error during login: {}", e.getLocalizedMessage());
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR);
+        }
+
+    }
+
+    private void refreshTokens(){
+        logger.info("Start refreshToken");
+        httpClient.setFollowRedirects(false);
+        Request request = httpClient.newRequest("https://gruenbeckb2c.b2clogin.com" + tenant + "/oauth2/v2.0/token");
+        request.method(HttpMethod.POST);
+
+        request.agent("Gruenbeck/320 CFNetwork/978.0.7 Darwin/18.7.0");
+        request.header("Host", "gruenbeckb2c.b2clogin.com");
+        request.header("x-client-SKU", "MSAL.iOS");
+        request.header("Accept", "application/json");
+        request.header("x-client-OS", "12.4.1");
+        request.header("x-app-name", "Grünbeck myProduct");
+        request.header("x-client-CPU", "64");
+        request.header("x-app-ver", "1.0.4");
+        request.header("Accept-Language", "de-de");
+        request.header("Accept-Encoding", "br, gzip, deflate");
+        request.header("client-request-id", "4719C1AF-93BC-4F7B-8B17-9F298FF2E9AB");
+        request.header("x-client-Ver", "0.2.2");
+        request.header("x-client-DM", "iPhone");
+        request.header("return-client-request-id", "true");
+        request.header("cache-control", "no-cache");
+        request.header("Connection", "keep-alive");
+        request.header("Content-Type", "application/json");
+        request.content(new StringContentProvider("{\"client_id\": \"5a83cc16-ffb1-42e9-9859-9fbf07f36df8\",\"scope\": \"https://gruenbeckb2c.onmicrosoft.com/iot/user_impersonation openid profile offline_access\",\"refresh_token\": "+refreshToken+",\"client_info\": \"1\",\"grant_type\": \"refresh_token\"}","utf-8"));
+
+        ContentResponse tokenResponse;
+        try {
+            tokenResponse = request.send();
+            logger.debug("refreshToken response headers: {}", tokenResponse.getHeaders());
+            logger.debug("refreshToken Result from WS call: {}", tokenResponse.getContentAsString());
+            JsonObject responseJSON = new Gson().fromJson(tokenResponse.getContentAsString(), JsonObject.class);
+            accessToken = responseJSON.get("access_token").getAsString();
+            refreshToken = responseJSON.get("refresh_token").getAsString();
+
+        } catch (InterruptedException | TimeoutException | ExecutionException e) {
+            // TODO Auto-generated catch block
+            logger.error("refreshToken error during login: {}", e.getLocalizedMessage());
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR);
         }
 
@@ -313,6 +361,10 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
             if (this.initializeTask != null) {
                 this.initializeTask.cancel(true);
                 this.initializeTask = null;
+            }
+            if (this.refreshTokenTask != null) {
+                this.refreshTokenTask.cancel(true);
+                this.refreshTokenTask = null;
             }
             httpClient.stop();
         } catch (Exception e) {
@@ -545,6 +597,9 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
         try {
             response3 = request3.send();
         logger.debug("response from asyncHeartbeat {}", response3.getStatus());
+        if (response3.getStatus() == 401){
+            refreshTokens();
+        }
         logger.debug("response from asyncHeartbeat {}", response3.getContentAsString());
 
          } catch (Exception e) {
