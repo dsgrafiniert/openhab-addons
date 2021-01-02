@@ -18,10 +18,10 @@ import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.smarthome.config.discovery.AbstractDiscoveryService;
-import org.eclipse.smarthome.config.discovery.DiscoveryResultBuilder;
-import org.eclipse.smarthome.core.thing.Bridge;
-import org.eclipse.smarthome.core.thing.ThingUID;
+import org.openhab.core.config.discovery.AbstractDiscoveryService;
+import org.openhab.core.config.discovery.DiscoveryResultBuilder;
+import org.openhab.core.thing.Bridge;
+import org.openhab.core.thing.ThingUID;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBindingConstants;
 import org.openhab.binding.gruenbeckcloud.internal.api.model.Device;
 import org.openhab.binding.gruenbeckcloud.internal.handler.GruenbeckCloudBridgeHandler;
