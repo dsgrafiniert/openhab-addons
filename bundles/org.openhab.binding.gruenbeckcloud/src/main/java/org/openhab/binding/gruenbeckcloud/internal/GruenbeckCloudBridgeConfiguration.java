@@ -19,7 +19,6 @@ package org.openhab.binding.gruenbeckcloud.internal;
  */
 public class GruenbeckCloudBridgeConfiguration {
 
-    
     public String username;
     public String password;
     public int refreshPeriod;

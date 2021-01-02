@@ -16,25 +16,20 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.thing.Bridge;
-import org.openhab.core.thing.ChannelUID;
-import org.openhab.core.thing.Thing;
-import org.openhab.core.thing.ThingStatus;
-import org.openhab.core.thing.ThingStatusDetail;
-import org.openhab.core.thing.ThingUID;
-import org.openhab.core.thing.binding.BaseThingHandler;
-import org.openhab.core.thing.binding.ThingHandler;
-import org.openhab.core.thing.binding.ThingHandlerCallback;
-import org.openhab.core.types.Command;
-import org.openhab.core.library.types.DecimalType;
-
-import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBindingConstants;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBridgeConfiguration;
 import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudSoftenerConfiguration;
 import org.openhab.binding.gruenbeckcloud.internal.api.model.Device;
 import org.openhab.binding.gruenbeckcloud.internal.api.model.Event;
 import org.openhab.binding.gruenbeckcloud.internal.listener.DeviceStatusListener;
-import org.slf4j.Logger;
+import org.openhab.core.library.types.DecimalType;
+import org.openhab.core.thing.Bridge;
+import org.openhab.core.thing.ChannelUID;
+import org.openhab.core.thing.Thing;
+import org.openhab.core.thing.ThingStatus;
+import org.openhab.core.thing.ThingStatusDetail;
+import org.openhab.core.thing.binding.BaseThingHandler;
+import org.openhab.core.thing.binding.ThingHandler;
+import org.openhab.core.types.Command;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -61,13 +56,12 @@ public class GruenbeckCloudSoftenerHandler extends BaseThingHandler implements D
         initializeThing(getBridge() == null ? null : getBridge().getStatus());
 
         logger.debug("Start initializing!");
-        
+
         bridgeHandler = (GruenbeckCloudBridgeHandler) getBridge().getHandler();
         startAutomaticRefresh();
-
     }
 
-        /**
+    /**
      * Initializes the {@link Thing} corresponding to the given status of the bridge.
      *
      * @param bridgeStatus
@@ -76,7 +70,7 @@ public class GruenbeckCloudSoftenerHandler extends BaseThingHandler implements D
         logger.info("initializeThing thing {} bridge status {}", getThing().getUID(), bridgeStatus);
         final GruenbeckCloudSoftenerConfiguration config = getThing().getConfiguration()
                 .as(GruenbeckCloudSoftenerConfiguration.class);
-        
+
         if (config != null) {
             device = new Device(config);
             final Thing thing = this.getThing();
@@ -85,12 +79,12 @@ public class GruenbeckCloudSoftenerHandler extends BaseThingHandler implements D
             // the bridge
             if (getGruenbeckCloudBridgeHandler() != null) {
                 if (bridgeStatus == ThingStatus.ONLINE) {
-                   // if (initializeProperties()) {
-                        updateStatus(ThingStatus.ONLINE);
-                   // } else {
-                   //     updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.GONE,
-                   //             "Device not found in GruenbeckCloud config. Was it removed?");
-                   // }
+                    // if (initializeProperties()) {
+                    updateStatus(ThingStatus.ONLINE);
+                    // } else {
+                    // updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.GONE,
+                    // "Device not found in GruenbeckCloud config. Was it removed?");
+                    // }
                 } else {
                     updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
                 }
@@ -118,7 +112,6 @@ public class GruenbeckCloudSoftenerHandler extends BaseThingHandler implements D
     @Override
     public void handleCommand(final ChannelUID channelUID, final Command command) {
         // TODO Auto-generated method stub
-
     }
 
     private @Nullable GruenbeckCloudBridgeHandler getGruenbeckCloudBridgeHandler() {
@@ -140,7 +133,6 @@ public class GruenbeckCloudSoftenerHandler extends BaseThingHandler implements D
         }
     }
 
-
     @Override
     public void dispose() {
         logger.debug("Running dispose()");
@@ -152,7 +144,7 @@ public class GruenbeckCloudSoftenerHandler extends BaseThingHandler implements D
             bridgeHandler.unregisterDeviceStatusListener(this);
         }
     }
-    
+
     @Override
     public void onDeviceStateChanged(final Device _device) {
         // TODO Auto-generated method stub
@@ -162,15 +154,15 @@ public class GruenbeckCloudSoftenerHandler extends BaseThingHandler implements D
     public void onDeviceStateChanged(final Device _device, final Event _event) {
         // TODO Auto-generated method stub
         logger.info("deviceStateChanged: {}, Event {}", _device, _event.getValues());
-        for (String key : _event.getValues().keySet()){
+        for (String key : _event.getValues().keySet()) {
             try {
-                logger.debug("deviceStateChanged: {}:{} - {}", key, (Double)_event.getValues().get(key), new DecimalType((Double)_event.getValues().get(key)));
-                updateState(key, new DecimalType((Double)_event.getValues().get(key)));
-            } catch (Exception e){
+                logger.debug("deviceStateChanged: {}:{} - {}", key, (Double) _event.getValues().get(key),
+                        new DecimalType((Double) _event.getValues().get(key)));
+                updateState(key, new DecimalType((Double) _event.getValues().get(key)));
+            } catch (Exception e) {
                 logger.error("deviceStateChanged: {}:{}, error {}", key, _event.getValues().get(key), e.getMessage());
 
             }
         }
     }
-
 }

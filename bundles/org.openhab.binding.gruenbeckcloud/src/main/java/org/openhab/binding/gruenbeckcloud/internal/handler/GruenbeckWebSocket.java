@@ -131,13 +131,11 @@ public class GruenbeckWebSocket {
                 public void writeSuccess() {
                     // TODO Auto-generated method stub
                     logger.debug("write success");
-
                 }
 
                 @Override
                 public void writeFailed(@Nullable Throwable xt) {
                     logger.debug("write failes {}", xt.getLocalizedMessage());
-
                 }
             });
             Future<Void> future = session.getRemote().sendStringByFuture(initialMessage);
@@ -169,7 +167,6 @@ public class GruenbeckWebSocket {
     public void onError(final Throwable cause) {
         logger.error("Gruenbeck WebSocket onError() - {}", cause.getMessage());
         eventListener.onError(cause);
-        
     }
 
     @OnWebSocketMessage
@@ -178,9 +175,10 @@ public class GruenbeckWebSocket {
         if (closing) {
             logger.debug("Gruenbeck WebSocket onMessage() - ignored, WebSocket is closing...");
         } else {
-            try{
-               String msg_stripped = msg.trim().replaceAll("\r\n", "\n").replaceAll("\r", "\n").replaceAll("[\\p{Cc}\\p{Cf}\\p{Co}\\p{Cn}&&[^\\s]]", "");
-          eventListener.onEvent(msg_stripped, device);
+            try {
+                String msg_stripped = msg.trim().replaceAll("\r\n", "\n").replaceAll("\r", "\n")
+                        .replaceAll("[\\p{Cc}\\p{Cf}\\p{Co}\\p{Cn}&&[^\\s]]", "");
+                eventListener.onEvent(msg_stripped, device);
             } catch (Exception e) {
                 logger.debug("Gruenbeck WebSocket onMessage() error - {}", e.getMessage());
 
@@ -189,9 +187,7 @@ public class GruenbeckWebSocket {
     }
 
     @OnWebSocketFrame
-    public void onFrame(final Frame frame){
+    public void onFrame(final Frame frame) {
         logger.debug("onFrame: {}", frame);
     }
-
-
 }

@@ -33,10 +33,7 @@ public class GruenbeckCloudBindingConstants {
     public static final ThingTypeUID THING_TYPE_GBC_SOFTENER = new ThingTypeUID(BINDING_ID, "softener");
     public static final ThingTypeUID THING_TYPE_GBC_BRIDGE = new ThingTypeUID(BINDING_ID, "bridge");
 
-    public static final Set<ThingTypeUID> DISCOVERABLE_THING_TYPE_UIDS = Collections
-            .singleton(THING_TYPE_GBC_SOFTENER);
-
-
+    public static final Set<ThingTypeUID> DISCOVERABLE_THING_TYPE_UIDS = Collections.singleton(THING_TYPE_GBC_SOFTENER);
 
     public static final String CONFIG_ID = "id";
     public static final String CONFIG_SERIAL = "serialNumber";
@@ -48,8 +45,7 @@ public class GruenbeckCloudBindingConstants {
     // List of all Channel ids
     public static final String CHANNEL_CURRENT_FLOW = "channelcurrentflow";
 
-       // Authorization related Servlet and resources aliases.
-       public static final String GBC_ALIAS = "/connectgruenbeckcloud";
-       public static final String GBC_IMG_ALIAS = "/img";
-   
+    // Authorization related Servlet and resources aliases.
+    public static final String GBC_ALIAS = "/connectgruenbeckcloud";
+    public static final String GBC_IMG_ALIAS = "/img";
 }

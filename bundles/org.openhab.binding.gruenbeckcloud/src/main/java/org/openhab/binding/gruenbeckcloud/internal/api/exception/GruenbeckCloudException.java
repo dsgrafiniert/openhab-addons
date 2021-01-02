@@ -22,5 +22,4 @@ public class GruenbeckCloudException extends RuntimeException {
     public GruenbeckCloudException(final String message) {
         super(message);
     }
-
 }

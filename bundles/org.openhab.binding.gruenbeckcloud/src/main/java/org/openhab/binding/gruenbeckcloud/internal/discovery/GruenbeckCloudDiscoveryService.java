@@ -18,13 +18,13 @@ import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBindingConstants;
+import org.openhab.binding.gruenbeckcloud.internal.api.model.Device;
+import org.openhab.binding.gruenbeckcloud.internal.handler.GruenbeckCloudBridgeHandler;
 import org.openhab.core.config.discovery.AbstractDiscoveryService;
 import org.openhab.core.config.discovery.DiscoveryResultBuilder;
 import org.openhab.core.thing.Bridge;
 import org.openhab.core.thing.ThingUID;
-import org.openhab.binding.gruenbeckcloud.internal.GruenbeckCloudBindingConstants;
-import org.openhab.binding.gruenbeckcloud.internal.api.model.Device;
-import org.openhab.binding.gruenbeckcloud.internal.handler.GruenbeckCloudBridgeHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,15 +89,15 @@ public class GruenbeckCloudDiscoveryService extends AbstractDiscoveryService {
 
         Map<String, Object> properties = new HashMap<>();
         ThingUID thingUID = new ThingUID(GruenbeckCloudBindingConstants.THING_TYPE_GBC_SOFTENER, device.getSerial());
-      //  properties.put(NeatoBindingConstants.CONFIG_SECRET, robot.getSecretKey());
+        // properties.put(NeatoBindingConstants.CONFIG_SECRET, robot.getSecretKey());
         properties.put(GruenbeckCloudBindingConstants.CONFIG_SERIAL, device.getSerial());
         properties.put(GruenbeckCloudBindingConstants.CONFIG_SERIES, device.getSeries());
         properties.put(GruenbeckCloudBindingConstants.CONFIG_ID, device.getId());
         properties.put(GruenbeckCloudBindingConstants.CONFIG_NAME, device.getName());
 
-        thingDiscovered(
-                DiscoveryResultBuilder.create(thingUID).withThingType(GruenbeckCloudBindingConstants.THING_TYPE_GBC_SOFTENER).withBridge(bridgeUID).withLabel(device.getName()+ " ("+device.getSerial()+")").withRepresentationProperty(device.getSerial()).withProperties(properties).build());
-    
+        thingDiscovered(DiscoveryResultBuilder.create(thingUID)
+                .withThingType(GruenbeckCloudBindingConstants.THING_TYPE_GBC_SOFTENER).withBridge(bridgeUID)
+                .withLabel(device.getName() + " (" + device.getSerial() + ")")
+                .withRepresentationProperty(device.getSerial()).withProperties(properties).build());
     }
-    
 }

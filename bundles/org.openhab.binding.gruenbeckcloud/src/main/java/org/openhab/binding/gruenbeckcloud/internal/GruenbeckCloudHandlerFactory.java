@@ -20,8 +20,11 @@ import java.util.Map;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
-import org.openhab.core.config.discovery.DiscoveryService;
+import org.openhab.binding.gruenbeckcloud.internal.discovery.GruenbeckCloudDiscoveryService;
+import org.openhab.binding.gruenbeckcloud.internal.handler.GruenbeckCloudBridgeHandler;
+import org.openhab.binding.gruenbeckcloud.internal.handler.GruenbeckCloudSoftenerHandler;
 import org.openhab.core.auth.client.oauth2.OAuthFactory;
+import org.openhab.core.config.discovery.DiscoveryService;
 import org.openhab.core.thing.Bridge;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingTypeUID;
@@ -29,9 +32,6 @@ import org.openhab.core.thing.ThingUID;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerFactory;
-import org.openhab.binding.gruenbeckcloud.internal.discovery.GruenbeckCloudDiscoveryService;
-import org.openhab.binding.gruenbeckcloud.internal.handler.GruenbeckCloudBridgeHandler;
-import org.openhab.binding.gruenbeckcloud.internal.handler.GruenbeckCloudSoftenerHandler;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.annotations.Component;
 
@@ -61,8 +61,7 @@ public class GruenbeckCloudHandlerFactory extends BaseThingHandlerFactory {
 
         if (THING_TYPE_GBC_SOFTENER.equals(thingTypeUID)) {
             return new GruenbeckCloudSoftenerHandler(thing);
-        } else 
-        if (THING_TYPE_GBC_BRIDGE.equals(thingTypeUID)) {
+        } else if (THING_TYPE_GBC_BRIDGE.equals(thingTypeUID)) {
             GruenbeckCloudBridgeHandler handler = new GruenbeckCloudBridgeHandler((Bridge) thing);
             registerAccountDiscoveryService(handler, (Bridge) thing);
             return handler;
@@ -79,5 +78,4 @@ public class GruenbeckCloudHandlerFactory extends BaseThingHandlerFactory {
 
         discoveryServiceRegistrations.put(handler.getThing().getUID(), serviceRegistration);
     }
-
 }

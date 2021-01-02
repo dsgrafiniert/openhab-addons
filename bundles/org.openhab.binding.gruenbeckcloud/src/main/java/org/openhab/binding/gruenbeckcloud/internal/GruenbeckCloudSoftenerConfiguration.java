@@ -22,7 +22,6 @@ import com.google.gson.annotations.SerializedName;
  */
 public class GruenbeckCloudSoftenerConfiguration {
 
-    
     public String id;
 
     public String serialNumber;
@@ -36,6 +35,6 @@ public class GruenbeckCloudSoftenerConfiguration {
 
     @Override
     public String toString() {
-        return "ID: "+ id +", name: "+name+", serialNumber: "+serialNumber;
+        return "ID: " + id + ", name: " + name + ", serialNumber: " + serialNumber;
     }
 }

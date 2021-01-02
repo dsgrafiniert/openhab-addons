@@ -14,7 +14,6 @@ package org.openhab.binding.gruenbeckcloud.internal.listener;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.binding.gruenbeckcloud.internal.api.model.Device;
-import org.openhab.binding.gruenbeckcloud.internal.handler.GruenbeckWebSocket;
 
 /**
  * The {@link EventListener} is called by the {@link InnogyWebSocket} on new Events and if the {@link InnogyWebSocket}
