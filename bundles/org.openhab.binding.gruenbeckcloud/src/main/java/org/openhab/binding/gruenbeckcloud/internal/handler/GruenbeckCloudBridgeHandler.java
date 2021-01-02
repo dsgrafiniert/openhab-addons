@@ -264,7 +264,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
             refreshToken = responseJSON.get("refresh_token").getAsString();
             Runnable refresher = () -> refreshTokens();
 
-            this.refreshTokenTask = scheduler.schedule(refresher, 300, TimeUnit.SECONDS);
+            this.refreshTokenTask = scheduler.schedule(refresher, 150, TimeUnit.SECONDS);
     
 
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
@@ -291,14 +291,23 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
         request.header("x-app-ver", "1.0.4");
         request.header("Accept-Language", "de-de");
         request.header("Accept-Encoding", "br, gzip, deflate");
-        request.header("client-request-id", "4719C1AF-93BC-4F7B-8B17-9F298FF2E9AB");
+        request.header("client-request-id", "E85BBC36-160D-48B0-A93A-2694F902BF19");
         request.header("x-client-Ver", "0.2.2");
         request.header("x-client-DM", "iPhone");
         request.header("return-client-request-id", "true");
         request.header("cache-control", "no-cache");
-        request.header("Connection", "keep-alive");
-        request.header("Content-Type", "application/json");
-        request.content(new StringContentProvider("{\"client_id\": \"5a83cc16-ffb1-42e9-9859-9fbf07f36df8\",\"scope\": \"https://gruenbeckb2c.onmicrosoft.com/iot/user_impersonation openid profile offline_access\",\"refresh_token\": "+refreshToken+",\"client_info\": \"1\",\"grant_type\": \"refresh_token\"}","utf-8"));
+        request.header("Content-Type", "application/x-www-form-urlencoded");
+
+        Fields fields = new Fields();
+        fields.add("client_info", "1");
+        fields.add("scope",
+                "https://gruenbeckb2c.onmicrosoft.com/iot/user_impersonation openid profile offline_access");
+        fields.add("grant_type", "refresh_token");
+        fields.add("refresh_token", refreshToken);
+        fields.add("client_id", "5a83cc16-ffb1-42e9-9859-9fbf07f36df8");
+        request.content(new FormContentProvider(fields));
+
+        logger.debug("refreshToken request: {}", request);
 
         ContentResponse tokenResponse;
         try {
@@ -546,7 +555,7 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
             logger.info("negotiateWS wsSession already established");
         }
         if (lastUpdate < System.currentTimeMillis()-60000){
-            logger.info("lastUpdate at lease 60 sec ago. Entering Realtime again");
+            logger.info("lastUpdate at least 60 sec ago. Entering Realtime again");
             enterRealtime(device.getSeries(), device.getSerial());
         }
         asyncHeartbeat(device.getSeries(), device.getId());
@@ -572,6 +581,9 @@ public class GruenbeckCloudBridgeHandler extends BaseBridgeHandler implements Ev
                  ContentResponse response3 = null;
                      response3 = request3.send();
                  logger.debug("response from realtime/enter {}", response3.getStatus());
+                 if (response3.getStatus() == 401){
+                    refreshTokens();
+                }
                  logger.debug("response from realtime/enter {}", response3.getContentAsString());
         } catch (Exception e) {
             logger.error("error during realtime/enter {}", e.getLocalizedMessage());
