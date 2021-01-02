@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="gruenbeckcloud"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+
+	<bridge-type id="bridge">
+
+		<label>Grünbeck Cloud Bridge</label>
+		<description>Bridge representing the Grünbeck Cloud Account</description>
+
+		<properties>
+			<property name="user"/>
+		</properties>
+
+		<representation-property>username</representation-property>
+
+		<config-description>			
+			<parameter name="password" type="text">
+				<required>true</required>
+				<label>Password</label>
+				<description>This is the password required to log in to Grünbeck Cloud.</description>
+			</parameter>
+			<parameter name="refreshPeriod" type="integer" min="1" max="60">
+				<required>true</required>
+				<default>10</default>
+				<label>Connect Refresh Period (seconds)</label>
+				<description>This is the frequency of the polling requests to the Grünbeck Cloud API. There are limits to the
+					number of requests
+					that can be sent to the API. The more often you poll, the better status updates - at the risk
+					of running out of
+					your request quota.</description>
+			</parameter>
+			<parameter name="username" type="text">
+				<required>true</required>
+				<label>User Name</label>
+				<description>This is the user name required to log in to Grünbeck Cloud</description>
+			</parameter>
+		</config-description>
+	</bridge-type>
+
+	<thing-type id="softener">
+		<supported-bridge-type-refs>
+			<bridge-type-ref id="bridge"/>
+		</supported-bridge-type-refs>
+
+		<label>Grünbeck Water Softener</label>
+		<description>Provides communication with Grünbeck Water Softener.</description>
+
+		<channels>
+
+
+
+
+
+						<channel id="mcountreg" typeId="mcountreg"/>
+						<channel id="mcountwater1" typeId="mcountwater1"/>
+						<channel id="mcountwater2" typeId="mcountwater2"/>
+						<channel id="mcountwatertank" typeId="mcountwatertank"/>
+						<channel id="msaltusage" typeId="msaltusage"/>
+						<channel id="mflowexc" typeId="mflowexc"/>
+						<channel id="mflowexc2reg1" typeId="mflowexc2reg1"/>
+						<channel id="mflowexc1reg2" typeId="mflowexc1reg2"/>
+						<channel id="mlifeadsorb" typeId="mlifeadsorb"/>
+						<channel id="mhardsoftw" typeId="mhardsoftw"/>
+						<channel id="mcapacity" typeId="mcapacity"/>
+						<channel id="maverage" typeId="maverage"/>
+						<channel id="mstddev" typeId="mstddev"/>
+						<channel id="mmax" typeId="mmax"/>
+						<channel id="mpress" typeId="mpress"/>
+						<channel id="mtemp" typeId="mtemp"/>
+						<channel id="mflowmax" typeId="mflowmax"/>
+						<channel id="mflowmax1reg2" typeId="mflowmax1reg2"/>
+						<channel id="mflowmax2reg1" typeId="mflowmax2reg1"/>
+						<channel id="mendreg1" typeId="mendreg1"/>
+						<channel id="mendreg2" typeId="mendreg2"/>
+
+
+
+
+
+						<channel id="mregpercent1" typeId="mregpercent1"/>
+						<channel id="mregpercent2" typeId="mregpercent2"/>
+						<channel id="mremregstep" typeId="mremregstep"/>
+						<channel id="mregstatus" typeId="mregstatus"/>
+						<channel id="mresidcap1" typeId="mresidcap1"/>
+						<channel id="mresidcap2" typeId="mresidcap2"/>
+						<channel id="mrescapa1" typeId="mrescapa1"/>
+						<channel id="mrescapa2" typeId="mrescapa2"/>
+						<channel id="mmaint" typeId="mmaint"/>
+						<channel id="mflow1" typeId="mflow1"/>
+						<channel id="mflow2" typeId="mflow2"/>
+						<channel id="mflowreg1" typeId="mflowreg1"/>
+						<channel id="mflowblend" typeId="mflowblend"/>
+						<channel id="mstep1" typeId="mstep1"/>
+						<channel id="mstep2" typeId="mstep2"/>
+						<channel id="mcurrent" typeId="mcurrent"/>
+						<channel id="mreswatadmod" typeId="mreswatadmod"/>
+						<channel id="msaltrange" typeId="msaltrange"/>
+		</channels>
+
+		<config-description>
+			<parameter name="serialNumber" type="text" required="true">
+				<label>Softener Serial</label>
+				<description>Serial number of the softener</description>
+			</parameter>
+
+			<parameter name="id" type="text" required="true">
+				<label>Softener ID</label>
+				<description>ID of the softener</description>
+			</parameter>
+
+			<parameter name="series" type="text" required="true">
+				<label>Softener Series</label>
+				<description>Series of the softener</description>
+			</parameter>
+
+			<parameter name="name" type="text" required="true">
+				<label>Device Name</label>
+				<description>Name of the softener as provided in myProduct App</description>
+			</parameter>
+
+		</config-description>
+	</thing-type>
+
+	<!-- Sample Channel Type -->
+	<channel-type id="mcountreg">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mcountreg Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+		<state readOnly="true" pattern="%.2f"/>
+	</channel-type>
+
+	<channel-type id="mcountwater1">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mcountwater1 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+	</channel-type>
+
+	<channel-type id="mcountwater2">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mcountwater2 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mcountwatertank">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mcountwatertank Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="msaltusage">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud msaltusage Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mflowexc">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mflowexc Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mflowexc2reg1">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mflowexc2reg1 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mflowexc1reg2">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mflowexc1reg2 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mlifeadsorb">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mlifeadsorb Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mhardsoftw">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mhardsoftw Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mcapacity">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mcapacity Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="maverage">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud maverage Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mstddev">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mstddev Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mmax">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mmax Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mpress">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mpress Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mtemp">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mtemp Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mflowmax">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mflowmax Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mflowmax1reg2">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mflowmax1reg2 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mflowmax2reg1">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mflowmax2reg1 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mendreg1">
+		<item-type>DateTime</item-type>
+		<label>GruenbeckCloud mendreg1 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" />
+</channel-type>
+
+	<channel-type id="mendreg2">
+		<item-type>DateTime</item-type>
+		<label>GruenbeckCloud mendreg2 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true"/>
+</channel-type>
+
+	<channel-type id="ibuiltindev">
+		<item-type>Switch</item-type>
+		<label>GruenbeckCloud ibuiltindev Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" />
+</channel-type>
+
+	<channel-type id="mregpercent1">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mregpercent1 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mregpercent2">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mregpercent2 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mremregstep">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mremregstep Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mregstatus">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mregstatus Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+
+	<channel-type id="mresidcap1">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mresidcap1 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+	
+	<channel-type id="mresidcap2">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mresidcap2 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+	
+	<channel-type id="mrescapa1">
+		<item-type>Number</item-type>
+		<label>Remaining Capacity 1</label>
+		<description>Capacity before next regeneration</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+	
+	<channel-type id="mrescapa2">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mrescapa2 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+	
+	<channel-type id="mmaint">
+		<item-type>Number</item-type>
+		<label>Next service</label>
+		<description>Days to next service</description>
+			<state readOnly="true" pattern="%f days"/>
+</channel-type>
+	
+	<channel-type id="mflow1">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mflow1 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+	
+	<channel-type id="mflow2">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mflow2 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+	
+	<channel-type id="mflowreg1">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mflowreg1 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+		
+	<channel-type id="mflowreg2">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mflowreg2 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+		
+	<channel-type id="mflowblend">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mflowblend Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+		
+	<channel-type id="mstep1">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mstep1 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+		
+	<channel-type id="mstep2">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mstep2 Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+		
+	<channel-type id="mcurrent">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mcurrent Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+		
+	<channel-type id="mreswatadmod">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud mreswatadmod Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+		
+	<channel-type id="msaltrange">
+		<item-type>Number</item-type>
+		<label>GruenbeckCloud msaltrange Channel</label>
+		<description>Sample channel for GruenbeckCloud Binding</description>
+			<state readOnly="true" pattern="%.2f"/>
+</channel-type>
+	
+
+</thing:thing-descriptions>
